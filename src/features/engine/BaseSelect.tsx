@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import type { EngineBase } from '../../lib/engine';
+import { tr, useLocale } from '../../lib/i18n';
 
 // Two-level base picker: a CATEGORY menu (Helmets, Body Armours, Wands, …) plus a VARIANT menu that
 // appears only when the category has attribute variants (the armour/shield Str/Dex/Int splits). Weapons
@@ -12,7 +13,8 @@ const labelCls = 'text-xs font-semibold uppercase tracking-wider text-muted-fore
 
 // "Body_Armours" -> "Body Armours"; "OneHand_Maces" -> "One Hand Maces".
 function categoryLabel(category: string): string {
-  return category.replace(/_/g, ' ').replace(/([a-z])([A-Z])/g, '$1 $2');
+  const en = category.replace(/_/g, ' ').replace(/([a-z])([A-Z])/g, '$1 $2');
+  return tr(en, `cat.${category}`);
 }
 
 // The attribute suffix of a base id, e.g. Helmets_str_int (category Helmets) -> "str_int" ("" if none).
@@ -57,13 +59,15 @@ function shortNames(name: string): string {
 function variantLabel(base: EngineBase, elementSplit: boolean): string {
   const suffix = variantSuffix(base);
   if (elementSplit) {
-    const head = suffix === '' ? 'Any element' : `${ELEMENT[suffix] ?? suffix} only`;
+    const head = suffix === ''
+      ? tr('Any element', 'ui.elementAny')
+      : tr(`${ELEMENT[suffix] ?? suffix} only`, 'ui.elementOnly', { name: tr(ELEMENT[suffix] ?? suffix, `el.${suffix}`) });
     return base.name && base.name !== base.id ? `${head} · ${shortNames(base.name)}` : head;
   }
   const parts = suffix.split('_').filter(Boolean);
   if (parts.length === 0) return base.name;
-  const attrs = parts.map((p) => ATTR[p] ?? p).join('/');
-  const defs = parts.map((p) => DEFENCE[p]).filter(Boolean).join(' + ');
+  const attrs = parts.map((p) => tr(ATTR[p] ?? p, `attr.${p}`)).join('/');
+  const defs = parts.map((p) => (DEFENCE[p] ? tr(DEFENCE[p], `def.${p}`) : '')).filter(Boolean).join(' + ');
   return defs ? `${attrs} · ${defs}` : attrs;
 }
 
@@ -74,6 +78,7 @@ export interface BaseSelectProps {
 }
 
 export const BaseSelect: React.FC<BaseSelectProps> = ({ bases, value, onChange }) => {
+  const locale = useLocale();
   const byCategory = useMemo(() => {
     const m = new Map<string, EngineBase[]>();
     for (const b of bases) (m.get(b.category) ?? m.set(b.category, []).get(b.category)!).push(b);
@@ -93,7 +98,7 @@ export const BaseSelect: React.FC<BaseSelectProps> = ({ bases, value, onChange }
 
   const categories = useMemo(
     () => [...byCategory.keys()].sort((a, b) => categoryLabel(a).localeCompare(categoryLabel(b))),
-    [byCategory],
+    [byCategory, locale],
   );
 
   const current = bases.find((b) => b.id === value);
@@ -106,14 +111,14 @@ export const BaseSelect: React.FC<BaseSelectProps> = ({ bases, value, onChange }
   return (
     <>
       <label className="flex flex-col gap-1">
-        <span className={labelCls}>Base</span>
+        <span className={labelCls}>{tr('Base', 'ui.base')}</span>
         <select className={`${selectCls} min-w-44`} value={category} onChange={(e) => selectCategory(e.target.value)}>
           {categories.map((c) => <option key={c} value={c}>{categoryLabel(c)}</option>)}
         </select>
       </label>
       {variants.length > 1 && (
         <label className="flex flex-col gap-1">
-          <span className={labelCls}>Variant</span>
+          <span className={labelCls}>{tr('Variant', 'ui.variant')}</span>
           <select
             className={`${selectCls} min-w-44`} value={value}
             onChange={(e) => onChange(e.target.value)}

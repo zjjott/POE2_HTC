@@ -10,6 +10,7 @@ import { cn } from '../../lib/utils';
 import PolicyGraph from './PolicyGraph';
 import { GearTradeLink } from './GearTradeLink';
 import { slotsOfHolding } from '../../lib/gearTrade';
+import { tr, useLocale } from '../../lib/i18n';
 
 /**
  * "Which item should I buy to start from — and how do I finish it from there?"
@@ -36,7 +37,9 @@ const worthNothing = (o: StartOption, scratch: number): boolean => o.worthUpTo <
  * modifiers, which made a one-modifier row read as two.
  */
 const modText = (m: string): string => m.split('\n').join(' / ');
-const nameOf = (r: StartOption): string => `${r.rarity === 'magic' ? 'Magic' : 'Rare'} · ${r.present.map(modText).join(' + ')}`;
+const rarityWord = (r: StartOption['rarity']): string =>
+  r === 'magic' ? tr('Magic', 'ui.magicWord') : tr('Rare', 'ui.rareWord');
+const nameOf = (r: StartOption): string => `${rarityWord(r.rarity)} · ${r.present.map(modText).join(' + ')}`;
 
 /** The game's colours for the two rarities, so a row's kind of item reads before its modifiers do. */
 const RARITY_CLS: Record<StartOption['rarity'], string> = {
@@ -84,6 +87,7 @@ interface Props {
 }
 
 const StartFromItem: React.FC<Props> = ({ markov, engine, rates, carved, ranAt, computing, recompute, solvedFor }) => {
+  const locale = useLocale();
   const [hidden, setHidden] = useHidden();
   const bodyId = React.useId();
   const sizes = startSizes(markov.holdings);
@@ -106,14 +110,14 @@ const StartFromItem: React.FC<Props> = ({ markov, engine, rates, carved, ranAt, 
   // Every key typed in a price box re-renders this panel, and the route under it stays the same. On a
   // big craft that graph is thousands of states, so it is built once per route, not once per key.
   const graph = React.useMemo(
-    () => (route === null ? null : <PolicyGraph result={route} rates={rates} startLabel="The item you buy" />),
-    [route, rates],
+    () => (route === null ? null : <PolicyGraph result={route} rates={rates} startLabel={tr('The item you buy', 'ui.itemYouBuy')} />),
+    [route, rates, locale],
   );
 
   const section = (body: React.ReactNode): React.ReactElement => (
     <Card className="p-4 space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h3 className="text-sm font-bold">Start from an item you buy instead</h3>
+        <h3 className="text-sm font-bold">{tr('Start from an item you buy instead', 'ui.buyInstead')}</h3>
         <button
           type="button"
           aria-expanded={!hidden}
@@ -121,7 +125,7 @@ const StartFromItem: React.FC<Props> = ({ markov, engine, rates, carved, ranAt, 
           onClick={() => setHidden(!hidden)}
           className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
         >
-          {hidden ? 'Show' : 'Hide'}
+          {hidden ? tr('Show', 'ui.show') : tr('Hide', 'ui.hide')}
         </button>
       </div>
       {!hidden && <div id={bodyId} className="space-y-3">{body}</div>}
@@ -131,8 +135,7 @@ const StartFromItem: React.FC<Props> = ({ markov, engine, rates, carved, ranAt, 
   if (carved) {
     return section(
       <p className="text-xs text-muted-foreground">
-        Not available for a craft that starts from fractured modifiers: that item is already the start, so
-        there is no white base for a bought one to replace.
+        {tr('Not available for a craft that starts from fractured modifiers: that item is already the start, so there is no white base for a bought one to replace.', 'ui.carvedNoBuy')}
       </p>,
     );
   }
@@ -147,19 +150,18 @@ const StartFromItem: React.FC<Props> = ({ markov, engine, rates, carved, ranAt, 
     return section(
       <>
         <p className="text-xs text-muted-foreground">
-          Every row here is a cost from the solve above, and that solve stopped before its costs settled —
-          so there is no list to trust yet.
+          {tr('Every row here is a cost from the solve above, and that solve stopped before its costs settled — so there is no list to trust yet.', 'ui.stoppedEarly')}
         </p>
         {next ? (
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
             <Button size="sm" disabled={computing} onClick={() => { setEffort(next.id); recompute(next.id); }}>
-              {computing ? 'Computing…' : `Compute again at ${next.label}`}
+              {computing ? tr('Computing…', 'ui.computing') : tr(`Compute again at ${next.label}`, 'ui.computeAgain', { label: next.label })}
             </Button>
             <span className="text-[11px] text-muted-foreground">{next.hint}</span>
           </div>
         ) : (
           <p className="text-xs text-muted-foreground">
-            This is <strong>{TOP_EFFORT.label}</strong> already — the craft is beyond what the solver can settle.
+            {tr(`This is ${TOP_EFFORT.label} already — the craft is beyond what the solver can settle.`, 'ui.beyondSettle', { label: TOP_EFFORT.label })}
           </p>
         )}
       </>,
@@ -171,7 +173,7 @@ const StartFromItem: React.FC<Props> = ({ markov, engine, rates, carved, ranAt, 
   if (sizes.length === 0) {
     return section(
       <p className="text-xs text-muted-foreground">
-        With a single target there is nothing to start from: an item already holding it is the finished item.
+        {tr('With a single target there is nothing to start from: an item already holding it is the finished item.', 'ui.singleTarget')}
       </p>,
     );
   }
@@ -193,21 +195,20 @@ const StartFromItem: React.FC<Props> = ({ markov, engine, rates, carved, ranAt, 
   return section(
     <>
       <p className="text-xs text-muted-foreground">
-        Buy an item that already has some of the target modifiers, then finish the craft from it. Type what
-        the item costs on trade to see whether that beats crafting from scratch.
+        {tr('Buy an item that already has some of the target modifiers, then finish the craft from it. Type what the item costs on trade to see whether that beats crafting from scratch.', 'ui.buyIntro')}
       </p>
 
       <p className="flex flex-wrap items-baseline gap-x-2 text-xs">
-        <span className="text-muted-foreground">Crafting from scratch costs</span>
+        <span className="text-muted-foreground">{tr('Crafting from scratch costs', 'ui.scratchCosts')}</span>
         <strong className="text-sm tabular-nums" title={exactExalts(scratch)}>{fmt(scratch)}</strong>
         {base > 0
-          ? <span className="text-muted-foreground">— a white base ({fmt(base)}) plus the craft</span>
-          : <span className="text-muted-foreground">— the white base counted as free; set <strong>Base cost</strong> if it is not</span>}
+          ? <span className="text-muted-foreground">{tr(`— a white base (${fmt(base)}) plus the craft`, 'ui.whitePlus', { cost: fmt(base) })}</span>
+          : <span className="text-muted-foreground">{tr('— the white base counted as free; set ', 'ui.whiteFreeLead')}<strong>{tr('Base cost', 'ui.baseCost')}</strong>{tr(' if it is not', 'ui.whiteFreeTail')}</span>}
       </p>
 
       <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs">
-        <div role="group" aria-label="Target modifiers already on the item" className="flex items-center gap-1.5">
-          <span className="text-muted-foreground">Modifiers already on the item</span>
+        <div role="group" aria-label={tr('Target modifiers already on the item', 'ui.modsAlreadyAria')} className="flex items-center gap-1.5">
+          <span className="text-muted-foreground">{tr('Modifiers already on the item', 'ui.modsAlready')}</span>
           {sizes.map((s) => (
             <button
               key={s}
@@ -224,7 +225,7 @@ const StartFromItem: React.FC<Props> = ({ markov, engine, rates, carved, ranAt, 
           ))}
         </div>
         <label className="flex items-center gap-1.5">
-          <span className="text-muted-foreground">Trade prices in</span>
+          <span className="text-muted-foreground">{tr('Trade prices in', 'ui.pricesIn')}</span>
           <select
             value={priceUnit.key}
             onChange={(e) => setPriceUnitKey(e.target.value as CostUnit['key'])}
@@ -239,11 +240,11 @@ const StartFromItem: React.FC<Props> = ({ markov, engine, rates, carved, ranAt, 
         <table className="w-full text-xs">
           <thead>
             <tr className="text-left text-[11px] text-muted-foreground">
-              <th className={th}>Item to buy</th>
-              <th className={cn(th, 'text-right')} title="The true expected cost of finishing the craft from this item">Cost to finish</th>
-              <th className={cn(th, 'text-right')} title="Crafting from scratch minus the cost to finish: pay less than this and you come out ahead">Pay at most</th>
-              <th className={cn(th, 'text-right')}>Trade price</th>
-              <th className={cn(th, 'text-right')} title="Trade price plus the cost to finish">Total</th>
+              <th className={th}>{tr('Item to buy', 'ui.itemToBuy')}</th>
+              <th className={cn(th, 'text-right')} title={tr('The true expected cost of finishing the craft from this item', 'ui.costFinishTitle')}>{tr('Cost to finish', 'ui.costToFinish')}</th>
+              <th className={cn(th, 'text-right')} title={tr('Crafting from scratch minus the cost to finish: pay less than this and you come out ahead', 'ui.payAtMostTitle')}>{tr('Pay at most', 'ui.payAtMost')}</th>
+              <th className={cn(th, 'text-right')}>{tr('Trade price', 'ui.tradePrice')}</th>
+              <th className={cn(th, 'text-right')} title={tr('Trade price plus the cost to finish', 'ui.totalTitle')}>{tr('Total', 'ui.total')}</th>
               <th className="pb-1"><span className="sr-only">Route</span></th>
             </tr>
           </thead>
@@ -257,13 +258,13 @@ const StartFromItem: React.FC<Props> = ({ markov, engine, rates, carved, ranAt, 
                   <td className="min-w-[14rem] py-1.5 pr-3">
                     <div className="flex items-start gap-1.5">
                       <span className={cn('mt-px shrink-0 rounded border px-1 text-[10px] font-semibold uppercase', RARITY_CLS[r.rarity])}>
-                        {r.rarity === 'magic' ? 'Magic' : 'Rare'}
+                        {rarityWord(r.rarity)}
                       </span>
                       <div>
                         {r.present.map((m) => <span key={m} className="block">{modText(m)}</span>)}
                         {isBest && (
                           <span className="mt-0.5 inline-block rounded bg-emerald-500/20 px-1 text-[10px] font-semibold text-emerald-700 dark:text-emerald-300">
-                            best buy
+                            {tr('best buy', 'ui.bestBuy')}
                           </span>
                         )}
                       </div>
@@ -271,7 +272,7 @@ const StartFromItem: React.FC<Props> = ({ markov, engine, rates, carved, ranAt, 
                   </td>
                   <td className="whitespace-nowrap py-1.5 pr-3 text-right tabular-nums" title={exactExalts(r.finish)}>{fmt(r.finish)}</td>
                   <td className={cn('whitespace-nowrap py-1.5 pr-3 text-right tabular-nums', worthNothing(r, scratch) && 'text-amber-600 dark:text-amber-300')}>
-                    {worthNothing(r, scratch) ? 'not worth buying' : fmt(r.worthUpTo)}
+                    {worthNothing(r, scratch) ? tr('not worth buying', 'ui.notWorth') : fmt(r.worthUpTo)}
                   </td>
                   <td className="py-1.5 pr-3 text-right">
                     <div className="flex flex-col items-end gap-1">
@@ -280,9 +281,9 @@ const StartFromItem: React.FC<Props> = ({ markov, engine, rates, carved, ranAt, 
                         type="text" inputMode="decimal" autoComplete="off" placeholder="—"
                         value={text}
                         onChange={(e) => { const v = e.target.value; setTyped((t) => ({ ...t, [r.key]: v })); }}
-                        aria-label={`Trade price for ${nameOf(r)}, in ${priceUnit.label}`}
+                        aria-label={tr(`Trade price for ${nameOf(r)}, in ${priceUnit.label}`, 'ui.priceFor', { name: nameOf(r), unit: priceUnit.label })}
                         aria-invalid={unreadable || undefined}
-                        title={unreadable ? 'Not a price — type a number, like 12 or 0.5' : undefined}
+                        title={unreadable ? tr('Not a price — type a number, like 12 or 0.5', 'ui.notAPrice') : undefined}
                         className={cn(
                           'w-16 rounded border bg-background px-1.5 py-0.5 text-right tabular-nums',
                           unreadable ? 'border-red-500' : 'border-border',
@@ -305,7 +306,9 @@ const StartFromItem: React.FC<Props> = ({ markov, engine, rates, carved, ranAt, 
                         <span className="block">{fmt(r.total)}</span>
                         <span className={cn('block text-[10px]', r.total < scratch
                           ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-300')}>
-                          {r.total < scratch ? `saves ${fmt(scratch - r.total)}` : `${fmt(r.total - scratch)} more`}
+                          {r.total < scratch
+                            ? tr(`saves ${fmt(scratch - r.total)}`, 'ui.saves', { n: fmt(scratch - r.total) })
+                            : tr(`${fmt(r.total - scratch)} more`, 'ui.more', { n: fmt(r.total - scratch) })}
                         </span>
                       </>
                     )}
@@ -314,11 +317,11 @@ const StartFromItem: React.FC<Props> = ({ markov, engine, rates, carved, ranAt, 
                     <button
                       type="button"
                       aria-pressed={chosen === r.key}
-                      aria-label={`Route from ${nameOf(r)}`}
+                      aria-label={tr(`Route from ${nameOf(r)}`, 'ui.routeFrom', { name: nameOf(r) })}
                       onClick={() => setChosen(chosen === r.key ? null : r.key)}
                       className="whitespace-nowrap rounded border border-border px-1.5 py-0.5 text-[11px] text-muted-foreground hover:text-foreground"
                     >
-                      {chosen === r.key ? 'Hide route' : 'Route ▸'}
+                      {chosen === r.key ? tr('Hide route', 'ui.hideRoute') : tr('Route ▸', 'ui.routeBtn')}
                     </button>
                   </td>
                 </tr>
@@ -336,46 +339,47 @@ const StartFromItem: React.FC<Props> = ({ markov, engine, rates, carved, ranAt, 
         >
           {wins ? (
             <span>
-              Best of the items you priced: <strong>{nameOf(best)}</strong> — {fmt(best.total)} in total,{' '}
-              <strong>{fmt(scratch - best.total)} less</strong> than crafting from scratch.
+              {tr(
+                `Best of the items you priced: ${nameOf(best)} — ${fmt(best.total)} in total, ${fmt(scratch - best.total)} less than crafting from scratch.`,
+                'ui.bestStatus',
+                { name: nameOf(best), total: fmt(best.total), saved: fmt(scratch - best.total) },
+              )}
             </span>
           ) : (
             <span>
-              None of the items you priced beats crafting from scratch: the cheapest,{' '}
-              <strong>{nameOf(best)}</strong>, comes to {fmt(best.total)}, {fmt(best.total - scratch)} more.
+              {tr(
+                `None of the items you priced beats crafting from scratch: the cheapest, ${nameOf(best)}, comes to ${fmt(best.total)}, ${fmt(best.total - scratch)} more.`,
+                'ui.noneStatus',
+                { name: nameOf(best), total: fmt(best.total), more: fmt(best.total - scratch) },
+              )}
             </span>
           )}
         </p>
       )}
 
       <p className="text-[11px] text-muted-foreground">
-        The price sheet has no prices for items with specific modifiers, so type what you find on trade — a
-        dot or a comma both work (0.5 or 0,5). Each row assumes the <strong>rest of the item is empty</strong>:
-        a listing that also carries modifiers you do not want costs more to finish, because they have to come
-        off first. If a bought item goes badly, the plan may drop it and start over from a white base when
-        that is cheaper than fixing it — what you paid is spent either way.
+        {tr('The price sheet has no prices for items with specific modifiers, so type what you find on trade — a dot or a comma both work (0.5 or 0,5). Each row assumes the rest of the item is empty: a listing that also carries modifiers you do not want costs more to finish, because they have to come off first. If a bought item goes badly, the plan may drop it and start over from a white base when that is cheaper than fixing it — what you paid is spent either way.', 'ui.buyFoot')}
       </p>
 
       {picked && (
         <div className="space-y-2 border-t border-border pt-3">
           <div className="flex flex-wrap items-baseline justify-between gap-2 text-xs">
             <p>
-              <span className="text-muted-foreground">Route from </span>
+              <span className="text-muted-foreground">{tr('Route from ', 'ui.routeFromLine')}</span>
               <strong>{nameOf(picked)}</strong>
-              <span className="text-muted-foreground"> — finishing costs </span>
+              <span className="text-muted-foreground">{tr(' — finishing costs ', 'ui.finishCosts')}</span>
               <span className="tabular-nums" title={exactExalts(picked.finish)}>{fmt(picked.finish)}</span>
             </p>
             <button type="button" onClick={() => setChosen(null)} className="text-muted-foreground underline underline-offset-2 hover:text-foreground">
-              Hide this route
+              {tr('Hide this route', 'ui.hideThisRoute')}
             </button>
           </div>
           {worthNothing(picked, scratch) ? (
             <p className="text-[11px] text-amber-700 dark:text-amber-300">
-              From this item the cheapest move is to start over from a white base — it saves nothing over
-              crafting from scratch.
+              {tr('From this item the cheapest move is to start over from a white base — it saves nothing over crafting from scratch.', 'ui.restartCheap')}
             </p>
           ) : graph === null || drawn !== chosen ? (
-            <p className="text-[11px] text-muted-foreground">Drawing the route…</p>
+            <p className="text-[11px] text-muted-foreground">{tr('Drawing the route…', 'ui.drawingRoute')}</p>
           ) : graph}
         </div>
       )}

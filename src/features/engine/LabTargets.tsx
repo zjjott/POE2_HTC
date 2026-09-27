@@ -10,6 +10,7 @@ import { GearTradeLink } from './GearTradeLink';
 import RuneHint from './RuneHint';
 import { FOCUS_RING, selectCls } from './ui';
 import type { LabCraft } from './useLabCraft';
+import { tr, useLocale } from '../../lib/i18n';
 
 /** The Plan tab's second card: the item being aimed at, slot by slot, and what each choice means. */
 const LabTargets: React.FC<{ lab: LabCraft }> = ({ lab }) => {
@@ -18,6 +19,7 @@ const LabTargets: React.FC<{ lab: LabCraft }> = ({ lab }) => {
     regularEssenceUsed, patchTarget, toggleFractured, togglePinned, pinEffect, removeTarget,
     startAlternative, spare, setSpare, essenceFractureConflict, desecratedUsed, bossTargetable, normalTargets,
   } = lab;
+  useLocale();
   if (!(targets.length > 0 || freeSlots > 0)) return null;
   return (
     <Card className="p-4 space-y-2">
@@ -29,9 +31,11 @@ const LabTargets: React.FC<{ lab: LabCraft }> = ({ lab }) => {
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h3 className="text-sm font-bold">
           {targets.length === slots.length && freeSlots === 0
-            ? `Target item (${targets.length} mod${targets.length !== 1 ? 's' : ''})`
-            : `Target item (${slots.length + freeSlots} slot${slots.length + freeSlots !== 1 ? 's' : ''}, `
-              + `${targets.length} mod${targets.length !== 1 ? 's' : ''}${freeSlots > 0 ? ' named' : ''})`}
+            ? tr(`Target item (${targets.length} mod${targets.length !== 1 ? 's' : ''})`, 'ui.targetMods', { n: targets.length })
+            : tr(`Target item (${slots.length + freeSlots} slot${slots.length + freeSlots !== 1 ? 's' : ''}, `
+              + `${targets.length} mod${targets.length !== 1 ? 's' : ''}${freeSlots > 0 ? ' named' : ''})`, 'ui.targetSlots', {
+                slots: slots.length + freeSlots, n: targets.length, named: freeSlots > 0 ? tr(' named', 'ui.named') : '',
+              })}
         </h3>
         {/* The item as it stands in the list, before any solve: what it goes for, ready made. */}
         {engine && targets.length > 0 && (

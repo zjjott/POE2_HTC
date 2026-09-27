@@ -10,9 +10,10 @@
 // cancel-by-terminate cheap enough to be the whole cancellation story — see engineClient.ts.
 
 import { loadEngine } from './engine.ts';
+import { setLocale, type Locale } from './i18n.ts';
 import { runSolve, type SolveProgress, type SolveRequest, type SolveResult } from './solve.ts';
 
-export type WorkerRequest = { readonly id: number; readonly req: SolveRequest };
+export type WorkerRequest = { readonly id: number; readonly req: SolveRequest; readonly locale?: Locale };
 
 export type WorkerResponse =
   | { readonly id: number; readonly type: 'progress'; readonly progress: SolveProgress }
@@ -43,9 +44,12 @@ const post = (msg: WorkerResponse): void => { (self as unknown as DedicatedWorke
 void loadEngine().catch(() => undefined);
 
 self.onmessage = async (e: MessageEvent<WorkerRequest>): Promise<void> => {
-  const { id, req } = e.data;
+  const { id, req, locale } = e.data;
   try {
     const eng = await loadEngine();
+    // The worker has its own module state and no localStorage, so it stays English unless the
+    // request says otherwise. Policy labels (orbs, mod text) are baked here.
+    if (locale === 'en' || locale === 'zh-CN') setLocale(locale);
     // Progress is posted synchronously from inside the solve. The main thread is NOT free to drain it:
     // every message wakes a React re-render of the progress bar, so the cost is per-message and lands
     // on the thread the worker exists to protect. Value iteration once reported per sweep — ~100,001

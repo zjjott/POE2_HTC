@@ -38,6 +38,7 @@ import type { TierTarget } from './optimize.ts';
 import type { Spare } from './slots.ts';
 import { NO_SPARE, slotIndexGroups } from './slots.ts';
 import { solveDenseInPlace } from './denseSolve.ts';
+import { smallestFeasibleSurcharge } from './markovItemCap.ts';
 import type { ResolvedCandidate } from './markovSymmetry.ts';
 import {
   canonicalFilterFor, encoderFor, familiesOfTarget, mergeSlots, permutationClasses, slotMasksOf,
@@ -161,6 +162,29 @@ export interface MarkovResult {
   readonly routes?: RouteTable;
   /** The `restartCost` this solve ran with, echoed — present exactly when starting over was a move. */
   readonly restartCost?: number;
+  /**
+   * Expected number of bases this craft consumes from its start, restarts included: `1 / (1 − q)`,
+   * where `q` is the chance the optimal policy bins the item before it finishes.
+   *
+   * Present only when starting over was a move and the final values were costed in closed form, which
+   * is the only place `q` exists. A from-item solve keeps the one item, so it has no such count.
+   *
+   * When `maxItems` was set and the cap binds, this is the capped policy's count, and `expectedCost`
+   * is that policy's currency — the surcharge that forced the cap is not part of the number.
+   */
+  readonly inputItems?: number;
+  /** The cap the solve was asked for, echoed. Present only when `maxItems` was passed and restart exists. */
+  readonly maxItems?: number;
+  /**
+   * Whether `inputItems` is within `maxItems`. False when the cap was asked for and this policy
+   * still exceeds it — the search ran out of clock, or no policy wastes few enough bases.
+   */
+  readonly itemCapMet?: boolean;
+  /**
+   * The published policy is not the pure currency optimum: a restart was charged extra until the
+   * expected item count fitted. Absent when the cap was slack or was not asked for.
+   */
+  readonly itemCapBound?: boolean;
   /** The solved policy played on real items — present exactly when `replay` was asked for and the solve
    *  was EXACT. See markovReplay.ts. */
   readonly replay?: ReplayReport;
@@ -275,6 +299,17 @@ export interface MarkovOptions {
    * high. Zero is a legitimate value: a white base is, to a rounding error, free.
    */
   readonly restartCost?: number;
+  /**
+   * Expected bases from the start must be at most this — `1 / (1 − q(start))` ≤ `maxItems`.
+   *
+   * Enforced inside the solve, not as a filter afterwards. The currency-optimal policy is solved
+   * first. When it already fits, nothing changes. When it does not, a surcharge is added to the
+   * restart action alone and the policy is re-solved until the count fits; the reported cost is
+   * then that policy priced at the real `restartCost`, so the surcharge never appears as currency.
+   * Needs the closed-form policy evaluation (`solver: 'policy'`): value iteration has no `q`.
+   * Absent means no cap. Ignored when the craft cannot start over.
+   */
+  readonly maxItems?: number;
   /** Currencies the player doesn't have; the policy never plays one. */
   readonly policy?: CurrencyPolicy;
   /**
@@ -983,6 +1018,10 @@ export function markovFromItem(
   /** Policy-improvement rounds. PI converges in a handful; this is a runaway guard, not a budget. */
   const maxRounds = opts.maxRounds ?? 200;
   const V = new Float64Array(N); // 0-initialised, as above
+  // P(restart before the goal) from the last closed-form evaluation that succeeded. Value iteration
+  // never computes it, and a failed evaluation must not leave the previous policy's chances behind.
+  const qSaved = new Float64Array(N);
+  let qSavedOk = false;
   // …except a goal, which is worth what finishing there costs. The sweeps never write a goal, so this
   // is where its value comes from, here and after every reset below.
   const seedGoals = (): void => { for (let i = 0; i < N; i++) if (isGoalIdx[i] === 1) V[i] = finishCost[i]!; };
@@ -1073,13 +1112,17 @@ export function markovFromItem(
     lastThrow = thrown;
     return kept + thrown * a.rerollCost;
   };
-  const offerValue = (a: CompiledAction): number => a.cost + keepWeights(a, keptScratch);
+  // Added to a restart's cost while an item cap is being enforced, and nowhere else. Zero for the
+  // currency-optimal solve. The reported cost is always re-evaluated at zero — see the cap search.
+  let restartSurcharge = 0;
+  const paid = (a: CompiledAction): number => a.cost + (a.isRestart ? restartSurcharge : 0);
+  const offerValue = (a: CompiledAction): number => paid(a) + keepWeights(a, keptScratch);
   const valueOf = (a: CompiledAction): number => {
     if (a.offer > 1) return offerValue(a);
     if (a.selfProb >= 1 - 1e-12) return Infinity; // an action that only loops back can't make progress
     let s = 0;
     for (let j = 0; j < a.to.length; j++) s += a.prob[j]! * V[a.to[j]!]!;
-    return (a.cost + s) / (1 - a.selfProb);
+    return (paid(a) + s) / (1 - a.selfProb);
   };
   // Checked every CHECK sweeps rather than every sweep: Date.now() in the hot loop is measurable, and
   // a sweep is short enough that the overshoot is irrelevant next to a multi-second budget.
@@ -1112,6 +1155,7 @@ export function markovFromItem(
    * 0–1000 progress bar, so two phases fill one bar instead of resetting it halfway.
    */
   const iterate = (withRestart: boolean, pLo: number, pHi: number): boolean => {
+    qSavedOk = false; // value iteration has no q; a seed's chances must not outlive it
     let decades = 0; // log-distance the first sweep had left to travel; see the progress note below
     for (let iter = 0; iter < maxIters; iter++) {
       if (deadline !== Infinity && iter % DEADLINE_CHECK === 0 && Date.now() > deadline) return false;
@@ -1190,7 +1234,7 @@ export function markovFromItem(
       const i = states[r]!;
       const to = wTo[i]!; const pr = wPr[i]!;
       A[r * M + r] = 1 - selfW[i]!;
-      bc[r] = compiled[i]![pol[i]!]!.cost + spendOf[i]!;
+      bc[r] = paid(compiled[i]![pol[i]!]!) + spendOf[i]!;
       for (let j = 0; j < to.length; j++) {
         const t = to[j]!;
         if (t === i) continue; // an offer's self-weight, already in `selfW`
@@ -1242,6 +1286,7 @@ export function markovFromItem(
    * affairs — an improper policy has infinite value — and the caller must not read V after it.
    */
   const evaluateClosedForm = (pol: Int32Array, evalCap?: number): boolean => {
+    qSavedOk = false;
     // Frozen realized weights per state, against V as it stands right now.
     const wTo: Int32Array[] = new Array<Int32Array>(N);
     const wPr: Float64Array[] = new Array<Float64Array>(N);
@@ -1263,7 +1308,7 @@ export function markovFromItem(
       // removal; it stays so that an improper policy can never again read as a free craft.
       if (k < 0) { isTerm[i] = 1; cOf[i] = Infinity; continue; }
       const a = compiled[i]![k]!;
-      if (a.isRestart) { isTerm[i] = 1; cOf[i] = a.cost; qOf[i] = 1; continue; }
+      if (a.isRestart) { isTerm[i] = 1; cOf[i] = paid(a); qOf[i] = 1; continue; }
       if (a.offer <= 1) {
         wTo[i] = a.to; wPr[i] = a.prob; selfW[i] = a.selfProb;
       } else {
@@ -1306,7 +1351,7 @@ export function markovFromItem(
         const to = wTo[i]!; const pr = wPr[i]!;
         const denom = 1 - selfW[i]!;
         if (denom <= 1e-12) { cOf[i] = Infinity; qOf[i] = 1; continue; } // only loops back: no progress
-        let cAcc = a.cost + spendOf[i]!; let qAcc = 0;
+        let cAcc = paid(a) + spendOf[i]!; let qAcc = 0;
         for (let j = 0; j < to.length; j++) {
           const t = to[j]!;
           // Self-weight is divided out below, never summed here. For an ordinary action `to` already
@@ -1338,6 +1383,8 @@ export function markovFromItem(
       if (canReach[i] !== 1) continue;       // stays pinned at Infinity
       V[i] = cOf[i]! + qOf[i]! * lambda;
     }
+    qSaved.set(qOf);
+    qSavedOk = true;
     return true;
   };
 
@@ -1439,6 +1486,10 @@ export function markovFromItem(
     return pol;
   };
 
+  // The policy the last successful `iteratePolicy` settled on. The cap search reads it back: the
+  // graph has to draw THAT policy, not a fresh argmin at the real restart price, or the surcharge
+  // is undone the moment it is removed.
+  const polHeld = new Int32Array(N).fill(-1);
   const iteratePolicy = (pLo: number, pHi: number, seedPol?: Int32Array, evalCap?: number): boolean => {
     const pol = seedPol ?? new Int32Array(N).fill(-1);
     let evaluated = 0;
@@ -1477,7 +1528,7 @@ export function markovFromItem(
       }
       // The certificate. Not "the numbers stopped moving" — the POLICY stopped moving, which for a
       // finite MDP means no action anywhere improves on it, i.e. this is the optimal policy exactly.
-      if (round > 0 && changed === 0 && settled) return true;
+      if (round > 0 && changed === 0 && settled) { polHeld.set(pol); return true; }
 
       // ── evaluate ─────────────────────────────────────────────────────────────
       // Closed form by default; the iterative path stays reachable so the two can be diffed. See
@@ -1601,6 +1652,68 @@ export function markovFromItem(
       ? 'no route reaches this target with the currencies you have — allow more and try again'
       : 'no policy reaches the target');
   }
+  // The currency optimum is already in V. An item cap, when it binds, replaces that policy with the
+  // cheapest one whose expected base count fits — by charging restarts extra until it does — and
+  // then prices the replacement at the real restart cost. The graph below must draw the replacement,
+  // not a fresh argmin: at the real price the currency optimum would win straight back.
+  let capFrozen: Int32Array | undefined;
+  let itemCapMet: boolean | undefined;
+  let itemCapBound = false;
+  const capAsked = opts.maxItems !== undefined && Number.isFinite(opts.maxItems) && opts.maxItems >= 1 && canRestart;
+  if (capAsked) {
+    const itemsNow = (): number => {
+      if (!qSavedOk) return Infinity;
+      const per = 1 - qSaved[startIdx]!;
+      return per > 0 ? 1 / per : Infinity;
+    };
+    itemCapMet = false;
+    const ready = qSavedOk && converged && polHeld[startIdx]! >= 0 && itemsNow() <= opts.maxItems!;
+    if (ready) itemCapMet = true;
+    else if (qSavedOk && converged && polHeld[startIdx]! >= 0 && itemsNow() > opts.maxItems!) {
+      const openV = new Float64Array(V);
+      const openQ = new Float64Array(qSaved);
+      const openPol = new Int32Array(polHeld);
+      const restore = (): void => {
+        restartSurcharge = 0;
+        V.set(openV);
+        qSaved.set(openQ);
+        qSavedOk = true;
+        polHeld.set(openPol);
+        capFrozen = undefined;
+        itemCapBound = false;
+        itemCapMet = false;
+      };
+      // The count the search sees is the one we will publish: the same actions, priced at the real
+      // restart cost. Offer orderings follow that value, not the surcharge, or the drawn edges and
+      // the item count would be two different policies.
+      const atRealPrice = (): number => {
+        restartSurcharge = 0;
+        let prev = Number.NaN;
+        for (let i = 0; i < 8; i++) {
+          if (!evaluateClosedForm(polHeld)) return Number.NaN;
+          const q = qSaved[startIdx]!;
+          if (Number.isFinite(prev) && Math.abs(q - prev) <= 1e-9) break;
+          prev = q;
+        }
+        return itemsNow();
+      };
+      const trial = (lambda: number): number => {
+        if (deadline !== Infinity && Date.now() > deadline) return Number.NaN;
+        restartSurcharge = lambda;
+        if (!iteratePolicy(500, 1000, polHeld)) return Number.NaN;
+        return atRealPrice();
+      };
+      const lambda = smallestFeasibleSurcharge(opts.maxItems!, trial);
+      const fitted = lambda !== undefined ? trial(lambda) : Number.NaN;
+      if (Number.isFinite(fitted) && fitted <= opts.maxItems!) {
+        capFrozen = new Int32Array(polHeld);
+        itemCapMet = true;
+        itemCapBound = true;
+      } else {
+        restore();
+      }
+    }
+  }
   const startCost = V[startIdx] ?? Infinity;
   if (!Number.isFinite(startCost)) return fail('no policy reaches the target');
 
@@ -1678,7 +1791,10 @@ export function markovFromItem(
     outStart[i] = outTo.length;
     const key = allStates[i]!;
     if (goalKeys.has(key)) continue;
-    const a = bestAction(key);
+    const frozenK = capFrozen?.[i];
+    const a = capFrozen
+      ? (frozenK !== undefined && frozenK >= 0 ? compiled[i]![frozenK] : undefined)
+      : bestAction(key);
     if (!a) continue;
     const shown = published(a);
     // `published` keeps the omen only where the plan rerolls, having just run the keep rule — so the
@@ -1718,9 +1834,18 @@ export function markovFromItem(
    * craft in front of you would cost with none of it done) and `ItemWorth` is built on that meaning.
    * It equals the empty Rare row only when the craft starts Rare.
    */
+  const qStart = qSavedOk ? qSaved[startIdx]! : 1;
+  const perAttempt = 1 - qStart;
+  const inputItems = qSavedOk && canRestart && perAttempt > 0 ? 1 / perAttempt : undefined;
   const holdings = startCandidates({
     list, slotMasks, rarities, encode, obstacles: siblings.obstacles.prefix | siblings.obstacles.suffix,
     valueAt: (key) => { const i = idxOfState.get(key); return i === undefined ? undefined : V[i]; },
+    // This item, plus the white bases a later restart still expects: 1 + q(s) / (1 − q(start)).
+    ...(inputItems === undefined ? {} : { itemsAt: (key: StateKey): number | undefined => {
+      const i = idxOfState.get(key);
+      if (i === undefined) return undefined;
+      return 1 + qSaved[i]! / perAttempt;
+    } }),
   });
   // Played on real items when asked — the replay classifies every item the way `s0` was classified and
   // asks this very policy what to do, so it can only ever describe the plan the result reports.
@@ -1755,6 +1880,8 @@ export function markovFromItem(
     ...(holdings.length > 0 ? { holdings } : {}),
     ...(opts.keepRoutes && bound === 'exact' ? { routes: table } : {}),
     ...(opts.restartCost !== undefined ? { restartCost: opts.restartCost } : {}),
+    ...(inputItems !== undefined ? { inputItems } : {}),
+    ...(capAsked ? { maxItems: opts.maxItems!, itemCapMet: itemCapMet === true, ...(itemCapBound ? { itemCapBound: true as const } : {}) } : {}),
     ...(replay ? { replay } : {}),
   };
 }

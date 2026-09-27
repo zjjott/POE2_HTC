@@ -27,6 +27,7 @@
     "update-data": "bash tools/refresh/run.sh",
     "update-prices": "node tools/refresh/prices.mjs",
     "og": "npx tsx scripts/og.mts",
+    "cn-item": "npx tsx scripts/cn-item.mts",
     "update-streamers": "npx tsx tools/streamers/fetch.mjs"
   },
   "dependencies": {

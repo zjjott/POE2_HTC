@@ -12,6 +12,8 @@ import { baseNameIndex, findBaseInName } from '../../packages/engine/src/baseLoo
 import { resolveMod } from '../../packages/engine/src/pool.ts';
 import { tierDisplay } from '../../packages/engine/src/tierFit.ts';
 import type { ItemModInput } from './engineTypes.ts';
+import { getLocale } from './i18n.ts';
+import { translateCnItem, translateModLines } from './pasteLocale.ts';
 
 /**
  * A pasted item, read into the shape the Item tab holds.
@@ -140,7 +142,7 @@ function toRow(
 export function readPastedItem(
   data: PatchData, text: string, choices: PasteChoices = NO_CHOICES,
 ): PasteReading | null {
-  const parsed = parseItemText(text);
+  const parsed = parseItemText(getLocale() === 'zh-CN' ? translateCnItem(text) : text);
   if (!parsed) return null;
 
   const problems: string[] = [];
@@ -176,12 +178,14 @@ export function readPastedItem(
       // The braces already say which lines belong together, so each modifier is its own question and
       // the grouping never is.
       for (const mod of explicit) {
-        const r = resolveMods(data, base, mod.lines, opts);
+        const lines = getLocale() === 'zh-CN' ? translateModLines(data, base.id, mod.lines) : mod.lines;
+        const r = resolveMods(data, base, lines, opts);
         for (const line of r.resolved) rows.push(toRow(data, line, [mod], choices));
         for (const u of r.unresolved) unresolved.push(u.line);
       }
     } else {
-      const r = resolveMods(data, base, explicit.flatMap((m) => m.lines), opts);
+      const raw = explicit.flatMap((m) => m.lines);
+      const r = resolveMods(data, base, getLocale() === 'zh-CN' ? translateModLines(data, base.id, raw) : raw, opts);
       // A plain paste is one line per parsed modifier, so a resolved row consumes exactly as many of
       // them as it has lines — which is how a hybrid's flags reach the row that swallowed both.
       let at = 0;

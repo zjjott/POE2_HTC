@@ -5,6 +5,7 @@ import "./index.css"
 import { initSentry, ErrorBoundary } from "./lib/sentry"
 import { ErrorFallback } from "./ErrorFallback"
 import { PREFS_PREFIX } from "./lib/currencyPrefs"
+import { LOCALE_KEY } from "./lib/i18n"
 import { Analytics } from '@vercel/analytics/react';
 
 // Off unless VITE_SENTRY_DSN was set at BUILD time; loads in its own chunk when it is.
@@ -17,7 +18,7 @@ if (currentVersion !== CACHE_VERSION) {
   // Saved SETTINGS are not cache. This wipe exists to drop stale cached data on upgrade, but it would
   // also silently erase the player's "currencies I don't have" list every time the version is bumped —
   // and they would have no idea why their plans changed. Carry those keys across the clear.
-  const keep = Object.keys(localStorage).filter((k) => k.startsWith(PREFS_PREFIX));
+  const keep = Object.keys(localStorage).filter((k) => k.startsWith(PREFS_PREFIX) || k === LOCALE_KEY);
   const saved = keep.map((k) => [k, localStorage.getItem(k)] as const);
   localStorage.clear();
   sessionStorage.clear();

@@ -1,4 +1,5 @@
 import React from 'react';
+import { tr } from '../../lib/i18n';
 import { cn } from '../../lib/utils';
 import type { PriceEntry, TypedPrice } from '../../lib/tabletPrices';
 import type { CostUnit } from '../../lib/currency';
@@ -31,9 +32,11 @@ export const TradePrice: React.FC<{
       target="_blank"
       rel="noopener noreferrer"
       className={cn('rounded border border-border px-1.5 py-0.5 text-xs hover:border-primary/60 hover:text-foreground', FOCUS)}
-      title={loose ? 'Opens the trade site. This modifier shares its wording with a similar one, so the search may list both.' : 'Opens the trade site with this search filled in'}
+      title={loose
+        ? tr('Opens the trade site. This modifier shares its wording with a similar one, so the search may list both.', 'ui.searchTradeShare')
+        : tr('Opens the trade site with this search filled in', 'ui.searchTradeFilled')}
     >
-      Search on trade{loose && <span aria-hidden="true" className="ml-1 text-amber-400">≈</span>}
+      {tr('Search on trade', 'ui.searchTrade')}{loose && <span aria-hidden="true" className="ml-1 text-amber-400">≈</span>}
     </a>
     <PriceBox unit={unit} units={units} price={price} onPrice={onPrice} label={label} />
   </span>

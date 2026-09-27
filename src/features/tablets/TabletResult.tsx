@@ -8,7 +8,7 @@ import {
   type StartKind, type TabletBase, type WatchEntry, type WatchMod, type WatchTier,
 } from '../../lib/tablets';
 import type { PriceEntry, TypedPrice } from '../../lib/tabletPrices';
-import { FULL_USES, tradeUrl } from '../../lib/tradeLink';
+import { FULL_USES, tradeUrl, useTradeTick } from '../../lib/tradeLink';
 import PolicyGraph from '../engine/PolicyGraph';
 import { oneIn } from './TabletModPicker';
 import { ProfitVerdict } from '../profit/ProfitVerdict';
@@ -89,6 +89,7 @@ export const TabletResult: React.FC<{
   /** Curated sets hidden on this tablet. */
   hiddenCount: number;
 }> = ({ solved: { tablet, chosen, watch, markov, plainCost, start }, league, rates, orbPrices, prices, onPrice, recounting, unit, units, onUnit, onWatch, hiddenCount }) => {
+  useTradeTick();
   // What the whole craft costs: the plain tablet you start from, then rolling it — restarts, and the
   // Exalts that fill it to four modifiers, included.
   const cost = markov.feasible ? plainCost + markov.expectedCost : undefined;

@@ -7,6 +7,7 @@ import type { Spare } from '../../../packages/optimizer/src/slots.ts';
 import PolicyGraph from './PolicyGraph';
 import CraftAlong from './CraftAlong';
 import CostSpread, { type PlayOut } from './CostSpread';
+import { tr, useLocale } from '../../lib/i18n';
 
 /**
  * The true expected cost of a craft and its policy route — the card both gear tabs draw.
@@ -35,10 +36,12 @@ const TrueCostCard: React.FC<{
   /** Under the spread, reading the same play-out: the Plan tab's "Craft to sell". */
   sell?: React.ReactNode;
   children?: React.ReactNode;
-}> = ({ markov, rates, spare, along, playOut, budget, sale, sell, children }) => (
+}> = ({ markov, rates, spare, along, playOut, budget, sale, sell, children }) => {
+  useLocale();
+  return (
   <Card className="p-4 space-y-3">
     <div className="flex flex-wrap items-baseline justify-between gap-2">
-      <h3 className="text-sm font-bold">True expected cost</h3>
+      <h3 className="text-sm font-bold">{tr('True expected cost', 'ui.trueCost')}</h3>
       {/* An unconverged solve is a BOUND, not an estimate, and `bound` says which way it leans — a
           floor from an item you hold, which never restarts, so value iteration starts at 0 and climbs;
           a ceiling from white. Rendering it as a bare number would be the most precise-looking wrong
@@ -57,6 +60,7 @@ const TrueCostCard: React.FC<{
         picture or the route list is on screen. */}
     <PolicyGraph result={markov} rates={rates} spare={spare} />
   </Card>
-);
+  );
+};
 
 export default TrueCostCard;

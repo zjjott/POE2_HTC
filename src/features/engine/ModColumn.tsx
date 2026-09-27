@@ -1,5 +1,6 @@
 import React from 'react';
 import type { EngineMod } from '../../lib/engine';
+import { tr, useLocale } from '../../lib/i18n';
 import { AnyModRow } from './FreeSlots';
 import { selectCls } from './ui';
 
@@ -7,12 +8,12 @@ import { selectCls } from './ui';
 // mods use "T1"…"Tn" ("Tn · any" for the any-tier worst); essence mods use the level (Lesser/Normal/
 // Greater). The full name/ilvl label is shown in the target list once added.
 function tierHead(mod: EngineMod, ti: EngineMod['tiers'][number]): string {
-  if (mod.source === 'desecrated') return 'desecrated';
+  if (mod.source === 'desecrated') return tr('desecrated', 'ui.desecrated');
   if (mod.source === 'essence') {
     const m = ti.name.match(/^(Lesser|Greater) Essence of/);
     return m ? m[1]! : 'Normal';
   }
-  return ti.display === mod.tiers.length ? `T${ti.display} · any` : `T${ti.display}`;
+  return ti.display === mod.tiers.length ? `T${ti.display} · ${tr('any', 'ui.any')}` : `T${ti.display}`;
 }
 function tierOption(mod: EngineMod, ti: EngineMod['tiers'][number]): string {
   const head = tierHead(mod, ti);
@@ -49,7 +50,9 @@ interface ModColumnProps {
 // focus and detaching the "+" buttons mid-interaction. Hoisting it fixes both.
 const ModColumn: React.FC<ModColumnProps> = ({
   title, side, list, count, cap, spare, blockFor, pickTier, onPickTier, onAdd,
-}) => (
+}) => {
+  useLocale();
+  return (
   <div className="flex-1 min-w-0">
     <div className="flex items-center justify-between mb-1">
       <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{title}</h4>
@@ -57,7 +60,7 @@ const ModColumn: React.FC<ModColumnProps> = ({
     </div>
     <div className="max-h-64 overflow-y-auto rounded-md border border-border divide-y divide-border/50">
       {spare && <AnyModRow side={side} block={spare.block} onAdd={spare.onAdd} />}
-      {list.length === 0 && <p className="px-2 py-3 text-xs text-muted-foreground">No matches</p>}
+      {list.length === 0 && <p className="px-2 py-3 text-xs text-muted-foreground">{tr('No matches', 'ui.noMatches')}</p>}
       {list.map((m) => {
         const isEssence = m.source === 'essence';
         const isPerfect = m.source === 'perfect';
@@ -75,10 +78,10 @@ const ModColumn: React.FC<ModColumnProps> = ({
             title={disabled ? reason : m.id}
           >
             <span className="flex-1 min-w-0 truncate text-sm">{m.text}</span>
-            {isEssence && <span className="shrink-0 rounded bg-purple-500/15 px-1 text-[10px] text-purple-600 dark:text-purple-300">ess</span>}
-            {isPerfect && <span className="shrink-0 rounded bg-fuchsia-500/15 px-1 text-[10px] text-fuchsia-600 dark:text-fuchsia-300">perf</span>}
-            {isAlloy && <span className="shrink-0 rounded bg-amber-500/15 px-1 text-[10px] text-amber-600 dark:text-amber-300">alloy</span>}
-            {m.source === 'desecrated' && <span className="shrink-0 rounded bg-rose-500/15 px-1 text-[10px] text-rose-600 dark:text-rose-300">desec</span>}
+            {isEssence && <span className="shrink-0 rounded bg-purple-500/15 px-1 text-[10px] text-purple-600 dark:text-purple-300">{tr('ess', 'ui.ess')}</span>}
+            {isPerfect && <span className="shrink-0 rounded bg-fuchsia-500/15 px-1 text-[10px] text-fuchsia-600 dark:text-fuchsia-300">{tr('perf', 'ui.perf')}</span>}
+            {isAlloy && <span className="shrink-0 rounded bg-amber-500/15 px-1 text-[10px] text-amber-600 dark:text-amber-300">{tr('alloy', 'ui.alloy')}</span>}
+            {m.source === 'desecrated' && <span className="shrink-0 rounded bg-rose-500/15 px-1 text-[10px] text-rose-600 dark:text-rose-300">{tr('desec', 'ui.desec')}</span>}
             {reasonId && <span id={reasonId} className="sr-only">{reason}</span>}
             <select
               className={`${selectCls} h-7 py-0 pr-1 text-xs shrink-0`}
@@ -105,6 +108,7 @@ const ModColumn: React.FC<ModColumnProps> = ({
       })}
     </div>
   </div>
-);
+  );
+};
 
 export default ModColumn;

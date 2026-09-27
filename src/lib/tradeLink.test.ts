@@ -1,8 +1,10 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
 import { readFileSync } from 'node:fs';
+import { gunzipSync } from 'node:zlib';
 import { loadPatch } from '../../packages/engine/src/index.ts';
 import { TABLET_CATEGORY } from '../../packages/engine/src/types.ts';
-import { FULL_USES, tradeUrl } from './tradeLink';
+import { setLocale } from './i18n';
+import { FULL_USES, cnTradeUrl, tradeUrl } from './tradeLink';
 
 const query = (url: string): unknown =>
   JSON.parse(decodeURIComponent(new URL(url).search.replace(/^\?q=/, '')));
@@ -59,6 +61,30 @@ describe('tradeUrl — a search the player clicks', () => {
     expect(plain.query['status']).toEqual({ option: 'securable' });
     const any = query(tradeUrl({ league: 'L', baseName: 'Ritual Tablet', require: [FULL_USES], stats: [] })) as { query: Record<string, unknown> };
     expect(any.query).not.toHaveProperty('filters');
+  });
+});
+
+describe('tradeUrl — 国服', () => {
+  afterEach(() => setLocale('en'));
+
+  it('gzips the query onto the Tencent league path', async () => {
+    setLocale('zh-CN');
+    const url = await cnTradeUrl({
+      league: 'Forbidden Rites',
+      baseName: 'Ritual Tablet',
+      rarity: 'normal',
+      require: [FULL_USES],
+      stats: [],
+    });
+    const league = encodeURIComponent('周年庆巅峰挑战');
+    expect(url.startsWith(`https://poe.game.qq.com/trade2/search/poe2/${league}/`)).toBe(true);
+    const suffix = url.slice(url.lastIndexOf('/') + 1);
+    const json = JSON.parse(gunzipSync(Buffer.from(suffix.replace(/-/g, '+').replace(/_/g, '/'), 'base64')).toString('utf8')) as {
+      status: unknown; type: string; filters: { type_filters: { filters: { rarity: unknown } } };
+    };
+    expect(json.status).toEqual({ option: 'securable' });
+    expect(json.type).toBe('Ritual Tablet');
+    expect(json.filters.type_filters.filters.rarity).toEqual({ option: 'normal' });
   });
 });
 

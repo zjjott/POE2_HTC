@@ -43,7 +43,7 @@ function normalizeMod(m) {
   const weight = Number(m.DropChance);
   if (!Number.isFinite(weight)) return null;
   return {
-    name: m.Name,
+    name: stripHtml(m.Name),
     family: Array.isArray(m.ModFamilyList) ? m.ModFamilyList[0] : m.ModFamilyList,
     families: m.ModFamilyList || [],
     type: String(m.ModGenerationTypeID) === '1' ? 'prefix'

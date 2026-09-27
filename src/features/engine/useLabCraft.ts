@@ -4,6 +4,7 @@ import {
   type Engine, type EngineBase, type EngineMod, type EngineResult, type TargetInput, type ExistingItem,
   type EngineAlternatives, type AltTargetInput, type EngineMarkovResult,
 } from '../../lib/engine';
+import { useLocale } from '../../lib/i18n';
 import { toExcludedKeys, useExclusions } from '../../lib/currencyPrefs';
 import { limitsFor, useEffort } from '../../lib/searchEffort';
 import { withSpare } from './FreeSlots';
@@ -73,6 +74,9 @@ export function useLabCraft(engine: Engine | null) {
     ? 'the budget search will never relax, swap or drop it'
     : 'saved for when you set a budget; that search will never relax, swap or drop it';
   const [baseCost, setBaseCost] = useField('lab', 'baseCost');
+  // Expected bases the from-white MDP may consume. Empty means no cap. Default 100: a free base
+  // otherwise bins almost every miss, and the count is part of the solve, not a filter after it.
+  const [itemCap, setItemCap] = useState('100');
   // Runes socketed in the item being crafted. They change what it may HOLD, so they reach the picker's
   // rules (`limits` below) and every planner in the solve, not just the words on the page.
   const [runes, setRunes] = useField('lab', 'runes');
@@ -109,7 +113,8 @@ export function useLabCraft(engine: Engine | null) {
   const excludedKeys = toExcludedKeys(useExclusions());
   const effort = useEffort();
 
-  const bases: EngineBase[] = useMemo(() => (data ? listBases(data) : []), [data]);
+  const locale = useLocale();
+  const bases: EngineBase[] = useMemo(() => (data ? listBases(data) : []), [data, locale]);
   // The target pool = rollable + regular-essence mods (listMods) PLUS desecrated mods (Desecration on
   // a Rare) PLUS perfect-essence mods (a Perfect Essence on a Rare, which adds its mod while eating
   // one at random). All three need the item Rare first, so all three depend on the add-chain reaching
@@ -124,7 +129,7 @@ export function useLabCraft(engine: Engine | null) {
       prefixes: [...m.prefixes, ...extra.filter((x) => x.type === 'prefix')],
       suffixes: [...m.suffixes, ...extra.filter((x) => x.type === 'suffix')],
     };
-  }, [data, baseId, runes]);
+  }, [data, baseId, runes, locale]);
   const modById = useMemo(() => {
     const m = new Map<string, EngineMod>();
     for (const x of [...mods.prefixes, ...mods.suffixes]) m.set(x.id, x);
@@ -376,6 +381,8 @@ export function useLabCraft(engine: Engine | null) {
     // test is on the string being non-empty, not on the number being truthy.
     const bc = Number(baseCost);
     const hasBaseCost = baseCost.trim() !== '' && Number.isFinite(bc) && bc >= 0;
+    const capN = Number(itemCap);
+    const hasCap = !fromItem && itemCap.trim() !== '' && Number.isInteger(capN) && capN >= 1;
 
     const req: SolveRequest = {
       kind: 'lab',
@@ -383,6 +390,7 @@ export function useLabCraft(engine: Engine | null) {
       targets,
       ...(hasBudget ? { budget: b, want } : {}),
       ...(hasBaseCost ? { baseCost: bc } : {}),
+      ...(hasCap ? { maxItems: capN } : {}),
       effort: limitsFor(effortId),
       ...(excludedKeys.length > 0 ? { excluded: excludedKeys } : {}),
       ...(runes.length > 0 ? { runes } : {}),
@@ -403,7 +411,7 @@ export function useLabCraft(engine: Engine | null) {
 
   return {
     engine, data, bases, baseId, level, setLevel, changeBase, category, limits, runes, setRunes,
-    budget, setBudget, baseCost, setBaseCost, targets, fractured, pinned, pinEffect, spare, setSpare,
+    budget, setBudget, baseCost, setBaseCost, itemCap, setItemCap, targets, fractured, pinned, pinEffect, spare, setSpare,
     freeSlots, search, setSearch, pickTier, onPickTier, filtered, counts, slots, modById,
     addingTo, setAddingTo, blockFor, spareBlock, addSpare, offerSpare,
     addTarget, startAlternative, removeTarget, patchTarget, toggleFractured, togglePinned,

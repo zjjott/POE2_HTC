@@ -11,6 +11,7 @@ import WhatNext, { WHAT_NEXT_PANEL_ID } from './features/engine/WhatNext';
 // bindings, so this inlines the string; the manifest itself is not in the bundle (verified).
 import { version } from '../package.json';
 import { useIsGuide } from './lib/guideRoute';
+import { setLocale, tr, useLocale, type Locale } from './lib/i18n';
 
 // The guide is ~30 kB of prose that most visits never open, and the entry chunk is the thing
 // `preloadPatchData` exists to keep small — so it loads on demand, like the Sentry SDK.
@@ -31,6 +32,7 @@ export default function App() {
   const [rateOpen, setRateOpen] = useState(false);
   const [nextOpen, setNextOpen] = useState(false);
   const showGuide = useIsGuide();
+  const locale = useLocale();
   return (
     <div className="min-h-screen text-foreground bg-background">
       <header className="border-b border-border bg-gradient-to-r from-[oklch(0.20_0_0)] to-[oklch(0.24_0_0)]">
@@ -40,7 +42,7 @@ export default function App() {
               <h1 className="text-lg sm:text-xl md:text-2xl font-bold tracking-tight">
                 POE2HTC
               </h1>
-              <p className="text-[10px] sm:text-xs text-muted-foreground hidden sm:block">Path of Exile 2 How to Craft</p>
+              <p className="text-[10px] sm:text-xs text-muted-foreground hidden sm:block">{tr('Path of Exile 2 How to Craft', 'app.tagline')}</p>
             </div>
           </div>
 
@@ -56,9 +58,9 @@ export default function App() {
             <button
               onClick={() => openExternalLink('https://github.com/Dboire9')}
               className="hidden sm:flex items-center gap-2 hover:text-primary transition-colors cursor-pointer bg-transparent border-none"
-              aria-label="Created by Dboire — open the author's GitHub profile"
+              aria-label={tr("Created by Dboire — open the author's GitHub profile", 'app.author')}
             >
-              <span className="text-xs uppercase tracking-wider opacity-70 hidden lg:inline">Created by</span>
+              <span className="text-xs uppercase tracking-wider opacity-70 hidden lg:inline">{tr('Created by', 'app.by')}</span>
               <span className="font-medium text-sm">Dboire</span>
             </button>
             {/* The ask, first and warmest: a rating is the cheapest help a player can give, and the
@@ -66,34 +68,34 @@ export default function App() {
             <button
               onClick={() => setRateOpen((o) => !o)}
               className={`${CHIP} bg-pink-500/15 hover:bg-pink-500/25 border-pink-500/40 hover:border-pink-500/60 text-foreground`}
-              aria-label="Rate the app"
+              aria-label={tr('Rate the app', 'app.rate')}
               aria-expanded={rateOpen}
               aria-controls={RATE_PANEL_ID}
             >
               <span aria-hidden="true">💛</span>
-              <span className="hidden sm:inline">Rate the app</span>
+              <span className="hidden sm:inline">{tr('Rate the app', 'app.rate')}</span>
             </button>
             {/* The other half of the ask: not how the app is, but what it should do next — the player's
                 own words, to the same inbox (WhatNext, api/feedback.ts). */}
             <button
               onClick={() => setNextOpen((o) => !o)}
               className={`${CHIP} bg-emerald-500/10 hover:bg-emerald-500/20 border-emerald-500/30 hover:border-emerald-500/50`}
-              aria-label="What do you want next?"
+              aria-label={tr('What do you want next?', 'app.next')}
               aria-expanded={nextOpen}
               aria-controls={WHAT_NEXT_PANEL_ID}
             >
               <span aria-hidden="true">💡</span>
-              <span className="hidden sm:inline">What next?</span>
+              <span className="hidden sm:inline">{tr('What next?', 'app.next')}</span>
             </button>
             <button
               onClick={() => setReporting((r) => !r)}
               className={`${CHIP} bg-red-500/10 hover:bg-red-500/20 border-red-500/30 hover:border-red-500/50`}
-              aria-label="Report a problem"
+              aria-label={tr('Report a problem', 'app.report')}
               aria-expanded={reporting}
               aria-controls={PANEL_ID}
             >
               <span aria-hidden="true">🐛</span>
-              <span className="hidden sm:inline">Report a problem</span>
+              <span className="hidden sm:inline">{tr('Report a problem', 'app.report')}</span>
             </button>
             <button
               onClick={() => openExternalLink(DISCORD_URL)}
@@ -106,27 +108,39 @@ export default function App() {
             <button
               onClick={() => openExternalLink('https://buymeacoffee.com/dboire')}
               className={`${CHIP} bg-yellow-500/10 hover:bg-yellow-500/20 border-yellow-500/30 hover:border-yellow-500/50`}
-              aria-label="Support the project"
+              aria-label={tr('Support the project', 'app.support')}
             >
               <span aria-hidden="true">☕</span>
-              <span className="hidden lg:inline">Support</span>
+              <span className="hidden lg:inline">{tr('Support', 'app.support')}</span>
             </button>
             <button
               onClick={() => openExternalLink('https://github.com/Dboire9/POE2_HTC')}
               className={`${CHIP} bg-primary/10 hover:bg-primary/20 border-primary/30 hover:border-primary/50`}
-              aria-label={`Version ${version} — open the project on GitHub`}
+              aria-label={tr(`Version ${version} — open the project on GitHub`, 'app.version', { version })}
             >
               <span className="font-mono font-semibold leading-none">v{version}</span>
               <span className="opacity-30 leading-none hidden lg:inline">|</span>
-              <span className="hidden lg:inline">⭐ Star &amp; Contribute</span>
+              <span className="hidden lg:inline">⭐ {tr('Star & Contribute', 'app.star')}</span>
             </button>
+            <label className="flex items-center gap-1">
+              <span className="sr-only">{tr('Language', 'app.lang')}</span>
+              <select
+                aria-label={tr('Language', 'app.lang')}
+                value={locale}
+                onChange={(e) => setLocale(e.target.value as Locale)}
+                className="h-8 rounded-md border border-border bg-background px-1.5 text-xs"
+              >
+                <option value="en">English</option>
+                <option value="zh-CN">简体中文</option>
+              </select>
+            </label>
           </div>
         </div>
       </header>
 
       <main className="container py-3 sm:py-4 px-3 sm:px-4 space-y-3">
         {showGuide && (
-          <Suspense fallback={<p className="text-xs text-muted-foreground">Loading the guide…</p>}>
+          <Suspense fallback={<p className="text-xs text-muted-foreground">{tr('Loading the guide…', 'lab.guide')}</p>}>
             <GuidePage />
           </Suspense>
         )}

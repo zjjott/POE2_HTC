@@ -14,6 +14,7 @@ import LabTargets from './LabTargets';
 import LabResults from './LabResults';
 import { FOCUS_RING } from './ui';
 import { useDefaultBase, useEngine } from './useEngine';
+import { tr, useLocale } from '../../lib/i18n';
 import { useLabCraft } from './useLabCraft';
 
 /**
@@ -26,6 +27,7 @@ const EngineLab: React.FC = () => {
   const data = engine?.data ?? null;
   const lab = useLabCraft(engine);
   const [mode, setMode] = useMode();
+  useLocale();
 
   // A shared link wins over whatever was saved locally — you clicked it expecting to see that item —
   // but never silently: the previous workspace is snapshotted so the toast can put it back.
@@ -56,7 +58,7 @@ const EngineLab: React.FC = () => {
   if (loadErr) {
     return (
       <Card className="p-6">
-        <p className="text-destructive font-medium">Failed to load engine data</p>
+        <p className="text-destructive font-medium">{tr('Failed to load engine data', 'ui.loadFail')}</p>
         <p className="text-sm text-muted-foreground mt-1">{loadErr}</p>
       </Card>
     );
@@ -72,7 +74,7 @@ const EngineLab: React.FC = () => {
               boundary takes the page down. Reported from production 2026-09-04 by an Edge/zh-CN
               reader; the text inside an element gets rewritten in place instead, and the element
               React removes is still there. */}
-        <Spinner /><span>Loading patch data…</span>
+        <Spinner /><span>{tr('Loading patch data…', 'lab.loading')}</span>
       </div>
     );
   }
@@ -90,14 +92,14 @@ const EngineLab: React.FC = () => {
           onClick={() => setMode('plan')}
           aria-pressed={mode === 'plan'}
         >
-          Plan from scratch
+          {tr('Plan from scratch', 'tab.plan')}
         </button>
         <button
           className={`${tabCls(mode === 'item')} ${FOCUS_RING}`}
           onClick={() => setMode('item')}
           aria-pressed={mode === 'item'}
         >
-          I have an item
+          {tr('I have an item', 'tab.item')}
         </button>
         {/* A tablet is crafted with the same orbs and nothing else on this screen applies to it — no
             item level, no runes, no essences — so it gets its own tab rather than a fourth shape for
@@ -107,10 +109,10 @@ const EngineLab: React.FC = () => {
           onClick={() => setMode('tablets')}
           aria-pressed={mode === 'tablets'}
         >
-          Tablets{' '}
+          {tr('Tablets', 'tab.tablets')}{' '}
           {/* Shipped 2026-09-23: new enough that a returning player should notice it is there. */}
           <span className="ml-1 rounded-full bg-emerald-500/20 px-1.5 py-px align-middle text-[10px] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-300">
-            New
+            {tr('New', 'tab.new')}
           </span>
         </button>
         {/* Browsing gear is not crafting, so it gets its own tab rather than a third panel stacked
@@ -120,13 +122,13 @@ const EngineLab: React.FC = () => {
           onClick={() => setMode('gear')}
           aria-pressed={mode === 'gear'}
         >
-          Streamer gear
+          {tr('Streamer gear', 'tab.gear')}
           {/* Marked BETA because it ships unfinished, on purpose: a few streamers, a snapshot we
               refresh by hand, and reads that are approximate in named places (Sanctified rolls). The
               word is visible text, so it is also in the button's accessible name — a screen reader
               hears the same caveat a sighted player sees. */}
           <span className="ml-1.5 rounded border border-amber-500/50 bg-amber-500/10 px-1 py-px align-middle text-[9px] font-semibold uppercase tracking-wider text-amber-300">
-            Beta
+            {tr('Beta', 'tab.beta')}
           </span>
         </button>
       </div>

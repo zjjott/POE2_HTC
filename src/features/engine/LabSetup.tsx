@@ -9,21 +9,24 @@ import BaseSelect from './BaseSelect';
 import ModColumn from './ModColumn';
 import { selectCls } from './ui';
 import type { LabCraft } from './useLabCraft';
+import { tr, useLocale } from '../../lib/i18n';
 
 /** The Plan tab's first card: the base, what the craft may spend, the Compute button, and the mod picker. */
 const LabSetup: React.FC<{ lab: LabCraft }> = ({ lab }) => {
   const {
     bases, baseId, changeBase, level, setLevel, budget, setBudget, fractured, baseCost, setBaseCost,
+    itemCap, setItemCap,
     category, runes, setRunes, share, targets, reset, result, compute, canCompute, computing, progress,
     cancel, runErr, outcome, search, setSearch, filtered, counts, spare, limits, offerSpare, spareBlock,
     addSpare, blockFor, pickTier, onPickTier, addTarget,
   } = lab;
+  useLocale();
   return (
     <Card className="p-4 space-y-4">
       <div className="flex flex-wrap items-end gap-4">
         <BaseSelect bases={bases} value={baseId} onChange={changeBase} />
         <label className="flex flex-col gap-1">
-          <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Item level</span>
+          <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{tr('Item level', 'lab.level')}</span>
           <input
             type="number" min={1} max={100} value={level}
             onChange={(e) => setLevel(Math.max(1, Math.min(100, Number(e.target.value) || 1)))}
@@ -32,7 +35,7 @@ const LabSetup: React.FC<{ lab: LabCraft }> = ({ lab }) => {
         </label>
         <label className="flex flex-col gap-1">
           <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Budget <span className="font-normal normal-case opacity-70">(exalts, optional)</span>
+            {tr('Budget', 'lab.budget')} <span className="font-normal normal-case opacity-70">{tr('(exalts, optional)', 'lab.budgetNote')}</span>
           </span>
           <input
             type="number" min={0} step="any" value={budget} placeholder="ex"
@@ -46,13 +49,28 @@ const LabSetup: React.FC<{ lab: LabCraft }> = ({ lab }) => {
         {fractured.size === 0 && (
           <label className="flex flex-col gap-1">
             <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Base cost <span className="font-normal normal-case opacity-70">(exalts, optional)</span>
+              {tr('White base price', 'lab.baseCost')} <span className="font-normal normal-case opacity-70">{tr('(ex, this item level)', 'lab.baseCostNote')}</span>
             </span>
             <input
-              type="number" min={0} step="any" value={baseCost} placeholder="0"
+              type="number" min={0} step="any" value={baseCost} placeholder="ex"
               onChange={(e) => setBaseCost(e.target.value)}
               className={`${selectCls} w-28`}
-              title="What another white base costs you. At 0 the planner will bin a nearly-finished item rather than pay to fix it — right if bases are free, wrong if they aren't."
+              aria-label={tr('White base price in exalts for this item level', 'lab.baseCost')}
+              title={tr('What a white base of this item level costs, in exalts. Leave it blank only if the base is free — otherwise the planner treats it as 0 and would rather throw a nearly finished item away than pay to fix it.', 'lab.baseCostTitle')}
+            />
+          </label>
+        )}
+        {fractured.size === 0 && (
+          <label className="flex flex-col gap-1">
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              {tr('Item cap', 'lab.itemCap')}
+            </span>
+            <input
+              type="text" inputMode="numeric" autoComplete="off" value={itemCap}
+              onChange={(e) => setItemCap(e.target.value.replace(/[^\d]/g, ''))}
+              className={`${selectCls} w-24`}
+              aria-label={tr('Maximum expected number of items this craft may consume', 'lab.itemCapAria')}
+              title={tr('The plan is solved so the expected number of bases, including every one it bins, stays within this. Leave it blank for no cap. The cost shown is the currency that plan spends.', 'lab.itemCapTitle')}
             />
           </label>
         )}
@@ -60,13 +78,13 @@ const LabSetup: React.FC<{ lab: LabCraft }> = ({ lab }) => {
         <SearchEffort />
         <div className="flex-1" />
         <Button variant="outline" onClick={() => void share()} disabled={targets.length === 0} size="lg" title="Copy a link that reproduces this workspace">
-          Copy link
+          {tr('Copy link', 'lab.copy')}
         </Button>
         <Button variant="outline" onClick={reset} disabled={targets.length === 0 && !result} size="lg">
-          Reset
+          {tr('Reset', 'lab.reset')}
         </Button>
         <Button onClick={() => compute()} disabled={!canCompute} size="lg">
-          Find plans
+          {tr('Find plans', 'lab.find')}
         </Button>
       </div>
 
@@ -85,25 +103,25 @@ const LabSetup: React.FC<{ lab: LabCraft }> = ({ lab }) => {
 
       {/* Mod picker */}
       <div>
-        <label htmlFor="lab-mod-search" className="sr-only">Search modifiers to add as targets</label>
+        <label htmlFor="lab-mod-search" className="sr-only">{tr('Search modifiers to add as targets', 'ui.searchTargets')}</label>
         <input
           id="lab-mod-search"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search modifiers to add as targets…"
+          placeholder={tr('Search modifiers to add as targets…', 'ui.searchTargets')}
           className={`${selectCls} w-full mb-2`}
         />
         {/* Stacks on a phone. A bare `flex` kept both columns side by side at every width, so
             on a narrow screen each got half of it and the mod text was crushed to nothing. */}
         <div className="flex flex-col sm:flex-row gap-4">
           <ModColumn
-            title="Prefixes" side="prefix" list={filtered.prefixes}
+            title={tr('Prefixes', 'ui.prefix')} side="prefix" list={filtered.prefixes}
             count={counts.prefix + spare.prefixes} cap={limits.prefixes}
             {...(offerSpare ? { spare: { block: spareBlock('prefix'), onAdd: () => addSpare('prefix') } } : {})}
             blockFor={blockFor} pickTier={pickTier} onPickTier={onPickTier} onAdd={addTarget}
           />
           <ModColumn
-            title="Suffixes" side="suffix" list={filtered.suffixes}
+            title={tr('Suffixes', 'ui.suffix')} side="suffix" list={filtered.suffixes}
             count={counts.suffix + spare.suffixes} cap={limits.suffixes}
             {...(offerSpare ? { spare: { block: spareBlock('suffix'), onAdd: () => addSpare('suffix') } } : {})}
             blockFor={blockFor} pickTier={pickTier} onPickTier={onPickTier} onAdd={addTarget}

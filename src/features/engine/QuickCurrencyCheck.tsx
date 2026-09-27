@@ -6,6 +6,7 @@ import {
 } from '../../lib/engine';
 import { exactExalts, formatChance, formatCost, type Rates } from '../../lib/currency';
 import { modSourceLabel } from '../../lib/engineMap';
+import { tr, useLocale } from '../../lib/i18n';
 
 const selectCls =
   'h-9 rounded-md border border-input bg-background px-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring';
@@ -55,6 +56,7 @@ const QuickCurrencyCheck: React.FC<{
   itemMods: readonly EngineMod[];
   rates?: Rates;
 }> = ({ engine, item, addable, itemMods, rates }) => {
+  useLocale();
   const [addPick, setAddPick] = useState<string | null>(null);
   const [removePick, setRemovePick] = useState<string | null>(null);
 
@@ -75,12 +77,12 @@ const QuickCurrencyCheck: React.FC<{
   return (
     <>
       <Card className="p-4 space-y-3">
-        <h3 className="text-sm font-bold">What do you want to do?</h3>
+        <h3 className="text-sm font-bold">{tr('What do you want to do?', 'ui.whatDo')}</h3>
         <div className="flex flex-wrap gap-4">
           <label className="flex flex-col gap-1">
-            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Mod to add</span>
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{tr('Mod to add', 'ui.modToAdd')}</span>
             <select className={`${selectCls} min-w-72`} value={addModId ?? ''} onChange={(e) => setAddPick(e.target.value || null)}>
-              <option value="">— none —</option>
+              <option value="">{tr('— none —', 'ui.none')}</option>
               {addable.map((m) => (
                 <option key={m.id} value={m.id}>
                   {m.type === 'prefix' ? 'P' : 'S'} · {m.text}{modSourceLabel(m.source)}
@@ -89,9 +91,9 @@ const QuickCurrencyCheck: React.FC<{
             </select>
           </label>
           <label className="flex flex-col gap-1">
-            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Mod to sacrifice (Chaos / Annul)</span>
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{tr('Mod to sacrifice (Chaos / Annul)', 'ui.modSacrifice')}</span>
             <select className={`${selectCls} min-w-72`} value={removeModId ?? ''} onChange={(e) => setRemovePick(e.target.value || null)}>
-              <option value="">— none —</option>
+              <option value="">{tr('— none —', 'ui.none')}</option>
               {itemMods.map((m) => <option key={m.id} value={m.id}>{m.type === 'prefix' ? 'P' : 'S'} · {m.text}</option>)}
             </select>
           </label>
@@ -104,7 +106,7 @@ const QuickCurrencyCheck: React.FC<{
 
       {actions.length > 0 ? (
         <div className="space-y-2">
-          <h2 className="text-lg font-bold">Currency options</h2>
+          <h2 className="text-lg font-bold">{tr('Currency options', 'ui.currencyOptions')}</h2>
           {actions.map((a) => (
             // Key by label, not currency: Annulment appears twice (plain + Omen of Light) when the
             // sacrifice is a desecrated mod, and those must be distinct React keys.

@@ -1,5 +1,6 @@
 import React from 'react';
 import { RUNES, type Rune } from '../../../packages/engine/src/runes.ts';
+import { tr, useLocale } from '../../lib/i18n';
 
 /**
  * Which runes are socketed in the item being crafted.
@@ -32,8 +33,13 @@ const titled = (tag: string): string => tag.charAt(0).toUpperCase() + tag.slice(
  * seventh rune would need no copy here — and copy that has to be kept in step with a data table is
  * copy that eventually disagrees with it.
  */
-const effectOf = (rune: Rune): string =>
-  rune.effect.kind === 'pool' ? `${titled(rune.effect.tag)} modifiers to be rolled on it` : EFFECT[rune.id] ?? '';
+const effectOf = (rune: Rune): string => {
+  if (rune.effect.kind === 'pool') {
+    return tr(`${titled(rune.effect.tag)} modifiers to be rolled on it`, `rune.fx.${rune.id}`);
+  }
+  const en = EFFECT[rune.id] ?? '';
+  return en ? tr(en, `rune.fx.${rune.id}`) : '';
+};
 
 const RunePicker: React.FC<{
   /** The base's category, which decides which runes fit it. */
@@ -41,6 +47,7 @@ const RunePicker: React.FC<{
   value: readonly string[];
   onChange: (next: readonly string[]) => void;
 }> = ({ category, value, onChange }) => {
+  useLocale();
   const offered = RUNES.filter((r): r is Rune =>
     r.effect.kind !== 'convert' && (r.categories.length === 0 || r.categories.includes(category)));
   if (offered.length === 0) return null;
@@ -51,18 +58,18 @@ const RunePicker: React.FC<{
   return (
     <fieldset className="flex flex-col gap-1">
       <legend className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-        Runes socketed <span className="font-normal normal-case opacity-70">(optional)</span>
+        {tr('Runes socketed', 'ui.runes')} <span className="font-normal normal-case opacity-70">{tr('(optional)', 'ui.optional')}</span>
       </legend>
       <div className="flex flex-wrap items-center gap-3">
         {offered.map((r) => (
-          <label key={r.id} className="flex items-center gap-1.5 text-sm" title={`Allows ${effectOf(r)}.`}>
+          <label key={r.id} className="flex items-center gap-1.5 text-sm" title={tr(`Allows ${effectOf(r)}.`, 'rune.allows', { effect: effectOf(r) })}>
             <input
               type="checkbox"
               checked={value.includes(r.id)}
               onChange={() => toggle(r.id)}
               className="h-4 w-4 accent-amber-500"
             />
-            <span>{r.name}</span>
+            <span>{tr(r.name, `rune.${r.id}`)}</span>
             <span className="text-xs text-muted-foreground">— {effectOf(r)}</span>
           </label>
         ))}

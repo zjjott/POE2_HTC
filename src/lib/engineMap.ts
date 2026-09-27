@@ -14,6 +14,8 @@ import type {
   EngineAlternatives, EngineMarkovResult, EnginePolicyEdge, EnginePolicyNode, ExistingItem, PolicyMod,
   TargetInput, AltTargetInput,
 } from './engineTypes.ts';
+import { getLocale, tr } from './i18n.ts';
+import { lexiconModText, lexiconTierName } from './lexicon.ts';
 
 // ── Labels ────────────────────────────────────────────────────────────────────
 
@@ -22,6 +24,10 @@ export function prettyName(id: string): string {
 }
 
 const ORB_SUFFIX: Record<CurrencyTier, string> = { base: '', greater: ' (Greater)', perfect: ' (Perfect)' };
+function orbSuffix(tier: CurrencyTier): string {
+  if (getLocale() !== 'zh-CN' || tier === 'base') return ORB_SUFFIX[tier];
+  return tier === 'greater' ? '（高阶）' : '（完美）';
+}
 /** Desecration boss omen → its in-game name (Blackblooded=Kurgal, Liege=Amanamu, Sovereign=Ulaman). */
 const BOSS_LABEL: Record<'blackblooded' | 'liege' | 'sovereign', string> = {
   blackblooded: 'Blackblooded', liege: 'Liege', sovereign: 'Sovereign',
@@ -45,9 +51,27 @@ const CURRENCY_LABEL: Record<Exclude<PlanStep['currency'], 'throwaway'>, string>
   'greater-exalt': 'Exalted',
 };
 
+function shownText(data: PatchData, id: string): string {
+  return lexiconModText(id) ?? data.mods.get(id)?.text ?? id;
+}
+
+function shownTierName(modId: string, ilvl: number, english: string): string {
+  return lexiconTierName(modId, ilvl) ?? english;
+}
+
+function currencyWord(id: Exclude<PlanStep['currency'], 'throwaway'> | string): string {
+  const en = CURRENCY_LABEL[id as keyof typeof CURRENCY_LABEL];
+  if (!en) return id;
+  if (getLocale() !== 'zh-CN') return en;
+  const key = id === 'perfect-essence' ? 'cur.perfect-essence' : `cur.${id}`;
+  return tr(en, key);
+}
+
 function tierLabel(display: number, tierCount: number, name: string, ilvl: number, range: string): string {
-  const head = display === tierCount ? `T${display} · any` : `T${display}`;
-  return `${head} · ${name} · ilvl ${ilvl}${range}`;
+  const any = tr('any', 'tier.any');
+  const ilvlWord = tr('ilvl', 'tier.ilvl');
+  const head = display === tierCount ? `T${display} · ${any}` : `T${display}`;
+  return `${head} · ${name} · ${ilvlWord} ${ilvl}${range}`;
 }
 
 /** Essence mods label their tiers by essence level (the tier name already says "Greater Essence of …"). */
@@ -67,16 +91,16 @@ function essenceTierLabel(name: string, ilvl: number, range: string): string {
  */
 export function modSourceLabel(source: EngineMod['source']): string {
   switch (source) {
-    case 'perfect': return ' · Perfect Essence';
+    case 'perfect': return tr(' · Perfect Essence', 'src.perfect');
     // An Alloy shares the Perfect Essence's mechanic and nothing else a player would recognise: it is
     // its own currency, with its own name and its own market (3.6 ex to 2,261 ex, against the flat
     // 4.331 every one of them used to be charged).
-    case 'alloy': return ' · Alloy';
-    case 'essence': return ' · Essence only';
-    case 'desecrated': return ' · Desecrated';
+    case 'alloy': return tr(' · Alloy', 'src.alloy');
+    case 'essence': return tr(' · Essence only', 'src.essence');
+    case 'desecrated': return tr(' · Desecrated', 'src.desecrated');
     // Generic, because the rune's NAME is on the mod (`EngineMod.rune`) and this is keyed by source
     // alone. A picker that wants "· Thrud's Might" reads the name from there.
-    case 'rune': return ' · Rune';
+    case 'rune': return tr(' · Rune', 'src.rune');
     case 'normal': return '';
   }
 }
@@ -136,12 +160,13 @@ export function toEngineMod(data: PatchData, modId: string, type: 'prefix' | 'su
       const values = (t.ranges ?? []).map(rollLabel).filter((v) => v !== '');
       const range = values[0] ?? '';
       const suffix = range ? ` · ${range}` : '';
-      const label = isEssence ? essenceTierLabel(t.name, t.ilvl, suffix) : tierLabel(display, n, t.name, t.ilvl, suffix);
-      return { display, name: t.name, ilvl: t.ilvl, label, range, values };
+      const name = shownTierName(mod.id, t.ilvl, t.name);
+      const label = isEssence ? essenceTierLabel(name, t.ilvl, suffix) : tierLabel(display, n, name, t.ilvl, suffix);
+      return { display, name, ilvl: t.ilvl, label, range, values };
     })
     .sort((a, b) => a.display - b.display);
   return {
-    id: mod.id, text: mod.text ?? mod.id, type, family: mod.family,
+    id: mod.id, text: lexiconModText(mod.id) ?? mod.text ?? mod.id, type, family: mod.family,
     ...(mod.families && mod.families.length > 1 ? { families: mod.families } : {}),
     // A rune-pool modifier is `normal` to the engine and its own thing to a player: it is on offer
     // only because a rune is socketed, and the picker has to say so. `mod.rune` is the marker
@@ -229,7 +254,7 @@ export function addBlockedReason(data: PatchData, state: ItemState, mod: Mod): s
 
 /** Map an optimizer ParetoResult into the UI-shaped EngineResult (shared by from-white and from-item). */
 export function mapFrontier(data: PatchData, res: ParetoResult, poolAssumed = false): EngineResult {
-  const text = (id: string): string => data.mods.get(id)?.text ?? id;
+  const text = (id: string): string => shownText(data, id);
   const frontier: EnginePlan[] = res.frontier.map((plan) => {
     // A throwaway names no mod, so the step that removes it is labelled by the side it was rolled on.
     const throwaways = new Map(plan.steps.flatMap((s) =>
@@ -266,8 +291,8 @@ export function mapFrontier(data: PatchData, res: ParetoResult, poolAssumed = fa
         : constrainTo ? (constrainTo === 'prefix' ? ' + Sinistral' : ' + Dextral')
         : peOmen ? (peOmen === 'sinistral' ? ' + Sinistral' : ' + Dextral')
         : boss ? ` + Omen of the ${BOSS_LABEL[boss]}` : '';
-      const label = CURRENCY_LABEL[step.currency === 'throwaway' ? step.orb : step.currency]
-        + (orb ? ORB_SUFFIX[orb] : '')
+      const label = currencyWord(step.currency === 'throwaway' ? step.orb : step.currency)
+        + (orb ? orbSuffix(orb) : '')
         + (essenceLevel && essenceLevel !== 'normal' ? ` (${essenceLevel})` : '')
         + omen;
       // Each step names what it acts on: alchemy supplies 4 mods, chaos swaps one for another, annul
@@ -337,7 +362,7 @@ function paretoOnDisplayed(plans: readonly EnginePlan[]): EnginePlan[] {
 
 /** Engine slot → UI slot: turns minTierIndex back into a 1-based display tier and a compact label. */
 function toEngineSlot(data: PatchData, slot: SlotChange): EngineSlot {
-  const text = (id: string): string => data.mods.get(id)?.text ?? id;
+  const text = (id: string): string => shownText(data, id);
   if (slot.kind === 'dropped') return { kind: 'dropped', text: text(slot.from), fromText: text(slot.from) };
   const mod = resolveMod(data, slot.modId);
   const n = mod.tiers.length;
@@ -350,59 +375,75 @@ function toEngineSlot(data: PatchData, slot: SlotChange): EngineSlot {
   return slot.kind === 'swapped' ? { ...kept, fromText: text(slot.from) } : kept;
 }
 
+function sideWord(side: 'prefix' | 'suffix' | undefined): string | null {
+  if (side === 'prefix') return tr('Sinistral', 'side.sinistral');
+  if (side === 'suffix') return tr('Dextral', 'side.dextral');
+  return null;
+}
+
+function strengthWord(strength: 'base' | 'greater' | 'perfect'): string | null {
+  if (strength === 'base') return null;
+  return strength === 'greater' ? tr('Greater', 'cur.greater') : tr('Perfect', 'cur.perfect');
+}
+
+/** "Exalt (Sinistral, Greater)" in English; fullwidth parentheses once the locale is Chinese. */
+function paren(name: string, parts: readonly (string | null)[]): string {
+  const kept = parts.filter((x): x is string => x !== null);
+  if (kept.length === 0) return name;
+  if (getLocale() === 'zh-CN') return `${name}（${kept.join('，')}）`;
+  return `${name} (${kept.join(', ')})`;
+}
+
 function actionLabel(data: PatchData, action: McAction): string {
   if (action.currency === 'exalt') {
-    const sideLabel = action.side === 'prefix' ? 'Sinistral' : action.side === 'suffix' ? 'Dextral' : null;
-    const strengthLabel = action.strength === 'base' ? null : action.strength === 'greater' ? 'Greater' : 'Perfect';
-    if (sideLabel && strengthLabel) return `Exalt (${sideLabel}, ${strengthLabel})`;
-    if (sideLabel) return `Exalt (${sideLabel})`;
-    if (strengthLabel) return `Exalt (${strengthLabel})`;
-    return 'Exalt';
+    return paren(tr('Exalt', 'act.exalt'), [sideWord(action.side), strengthWord(action.strength)]);
   }
   if (action.currency === 'annul') {
-    if (action.light) return 'Annul (Omen of Light)';
-    const sideLabel = action.side === 'prefix' ? 'Sinistral' : action.side === 'suffix' ? 'Dextral' : null;
-    return sideLabel ? `Annul (${sideLabel})` : 'Annul';
+    if (action.light) return paren(tr('Annul', 'cur.annul'), [tr('Omen of Light', 'omen.light')]);
+    return paren(tr('Annul', 'cur.annul'), [sideWord(action.side)]);
   }
   if (action.currency === 'desecrate') {
-    const sideLabel = action.side === 'prefix' ? 'Sinistral' : action.side === 'suffix' ? 'Dextral' : null;
     // No boss omen — the untargeted draw over the whole pool. That is the only desecration available
     // on armour, so this is the common label, not an edge case: don't name an omen that isn't used.
-    const boss = action.boss ? `Omen of the ${BOSS_LABEL[action.boss]}` : null;
+    const boss = action.boss
+      ? tr(`Omen of the ${BOSS_LABEL[action.boss]}`, `omen.boss.${action.boss}`)
+      : null;
     // The bone's grade leads and the omens follow in the order they act — which pool, which side, then
     // the reroll: "Desecrate (Ancient, Dextral, Omen of Abyssal Echoes)".
-    const grade = action.ancient ? 'Ancient' : null;
-    const echoes = action.echoes ? 'Omen of Abyssal Echoes' : null;
-    const parts = [grade, boss, sideLabel, echoes].filter((x): x is string => x !== null);
-    return parts.length > 0 ? `Desecrate (${parts.join(', ')})` : 'Desecrate';
+    const grade = action.ancient ? tr('Ancient', 'omen.ancient') : null;
+    const echoes = action.echoes ? tr('Omen of Abyssal Echoes', 'omen.echoes') : null;
+    return paren(tr('Desecrate', 'cur.desecrate'), [grade, boss, sideWord(action.side), echoes]);
   }
   if (action.currency === 'transmute' || action.currency === 'augment' || action.currency === 'regal') {
-    const name = action.currency === 'transmute' ? 'Transmute'
-      : action.currency === 'augment' ? 'Augment' : 'Regal';
-    const strength = action.strength === 'base' ? null : action.strength === 'greater' ? 'Greater' : 'Perfect';
-    return strength ? `${name} (${strength})` : name;
+    const name = action.currency === 'transmute' ? tr('Transmute', 'cur.transmute')
+      : action.currency === 'augment' ? tr('Augment', 'cur.augment') : tr('Regal', 'cur.regal');
+    return paren(name, [strengthWord(action.strength)]);
   }
   // Not a currency: abandoning the craft and buying another base. Named for what the player does, not
   // for what it costs — "Restart" beside a 0ex price would read as a bug rather than as a free reroll.
-  if (action.currency === 'restart') return 'Start over with a new base';
+  if (action.currency === 'restart') return tr('Start over with a new base', 'act.restart');
   if (action.currency === 'perfect-essence') {
-    const sideLabel = action.side === 'prefix' ? 'Sinistral' : action.side === 'suffix' ? 'Dextral' : null;
-    return sideLabel ? `Perfect Essence (${sideLabel})` : 'Perfect Essence';
+    return paren(tr('Perfect Essence', 'cur.perfect-essence'), [sideWord(action.side)]);
   }
   // A regular Essence is bought BY NAME, and the name is the tier: an essence mod's tiers are its
   // levels, so `tiers[tierIndex].name` is literally "Greater Essence of Alacrity" — the thing the
   // player puts in the trade search. Falling back to the level word keeps this honest if a data
   // refresh ever drops the name, rather than printing a level the sheet did not price.
   if (action.currency === 'essence') {
-    const name = data.mods.get(action.target)?.tiers[action.tierIndex]?.name;
-    return name ?? `${action.level === 'lesser' ? 'Lesser ' : action.level === 'greater' ? 'Greater ' : ''}Essence`;
+    const mod = data.mods.get(action.target);
+    const tier = mod?.tiers[action.tierIndex];
+    const english = tier?.name;
+    const name = english ? (lexiconTierName(action.target, tier.ilvl) ?? english) : undefined;
+    if (name) return name;
+    const level = action.level === 'lesser' ? 'Lesser ' : action.level === 'greater' ? 'Greater ' : '';
+    return `${level}${tr('Essence', 'cur.essence')}`;
   }
-  return 'Chaos';
+  return tr('Chaos', 'cur.chaos');
 }
 
 /** A filled position named: the texts of the ids that could be filling it, joined with "or". */
 const positionLabel = (data: PatchData, ids: readonly string[]): string =>
-  ids.map((id) => data.mods.get(id)?.text ?? id).join(' or ');
+  ids.map((id) => lexiconModText(id) ?? data.mods.get(id)?.text ?? id).join(tr(' or ', 'ui.or'));
 
 /**
  * The tier a target was asked at, as the picker spells it (1 = best), for one POSITION.
@@ -515,7 +556,8 @@ export function mapMarkov(
     return labels.map((l, i) => {
       if ((seen.get(l) ?? 0) < 2) return l;
       const side = data.mods.get(positions[i]![0]!)?.type;
-      return side ? `${l} (${side})` : l;
+      const word = side === 'prefix' ? tr('prefix', 'side.prefix') : side === 'suffix' ? tr('suffix', 'side.suffix') : null;
+      return word ? `${l} (${word})` : l;
     });
   };
   const desecrateAssumed = leansOnAssumedOdds(res.policy.values());
@@ -532,9 +574,18 @@ export function mapMarkov(
     // both places rather than two spellings of one state — then disambiguated, because a holding puts
     // several positions on ONE line and two of them can print identically.
     ...(res.holdings ? {
-      holdings: res.holdings.map((h) => ({ present: bySide(h.present), positions: h.present, cost: h.cost, rarity: h.rarity, key: h.key })),
+      holdings: res.holdings.map((h) => ({
+        present: bySide(h.present), positions: h.present, cost: h.cost, rarity: h.rarity, key: h.key,
+        ...(h.items !== undefined ? { items: h.items } : {}),
+      })),
     } : {}),
     ...(res.restartCost !== undefined ? { restartCost: res.restartCost } : {}),
+    ...(res.inputItems !== undefined ? { inputItems: res.inputItems } : {}),
+    ...(res.maxItems !== undefined ? {
+      maxItems: res.maxItems,
+      itemCapMet: res.itemCapMet === true,
+      ...(res.itemCapBound ? { itemCapBound: true as const } : {}),
+    } : {}),
     ...(res.routes ? { routes: res.routes } : {}),
     // The replay, as plain numbers: the watch shares a caller asked for, and what the policy really
     // costs. A declined replay carries its reason instead, so a panel can say why a column is empty.

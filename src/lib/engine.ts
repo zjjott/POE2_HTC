@@ -45,6 +45,9 @@ import {
   prettyName, toEngineMod, toTierTargets, toAltTargets, buildItemState, addBlockedReason,
   bossOmenLabel, mapFrontier, mapAlternatives, mapMarkov, mapRoute, rollLabel,
 } from './engineMap.ts';
+import { installLexicon, lexiconBaseName, lexiconModText, lexiconTierName, type LexiconFile } from './lexicon.ts';
+import { getLocale } from './i18n.ts';
+import localeUrl from '../../data/patches/0.5.0/locale/zh-CN.json?url';
 
 // Fetched as URLs (Vite copies them to /assets) rather than imported as modules, so the big JSON is
 // lazily loaded and never inflates the main bundle or the TS type-checker.
@@ -115,11 +118,13 @@ export function loadEngine(): Promise<Engine> {
       // `Response.json()` is `any`, so without these the three files entered `indexPatch` /
       // `indexPrices` unchecked — the one place a data refresh could change a shape and nothing would
       // complain until a probability came out wrong. Named here, at the boundary they cross.
-      const [mods, bases, prices] = await Promise.all([
+      const [mods, bases, prices, locale] = await Promise.all([
         jsonOf<ModsFile>(modsRes, 'the modifier data'),
         fetch(basesUrl).then((r) => jsonOf<BasesFile>(r, 'the base-item data')),
         fetch(pricesUrl).then((r) => jsonOf<PricesFile>(r, 'the price sheet')),
+        fetch(localeUrl).then((r) => jsonOf<LexiconFile>(r, 'the Chinese lexicon')).catch(() => null),
       ]);
+      if (locale) installLexicon(locale);
       return { data: indexPatch(mods, bases), prices: indexPrices(prices) };
     })();
     // A FAILED load must not be memoised. It was: one dropped request left `cache` holding a rejected
@@ -167,7 +172,7 @@ export function listBases(data: PatchData): EngineBase[] {
     // or staff variant the data holds the real game bases that row covers ("Frigid Wand"), which is
     // how a player recognises the item in their stash and is not derivable from the id at all.
     .map((b): EngineBase => ({
-      id: b.id, name: b.name && b.name !== b.id ? b.name : prettyName(b.id), category: b.category,
+      id: b.id, name: lexiconBaseName(b.name && b.name !== b.id ? b.name : prettyName(b.id)), category: b.category,
     }))
     .sort((a, b) => a.name.localeCompare(b.name));
 }
@@ -208,11 +213,12 @@ export function listPerfectEssences(data: PatchData, baseId: string): EngineMod[
       const t = mod.tiers[0]!;
       const values = (t.ranges ?? []).map(rollLabel).filter((v) => v !== '');
       const range = values[0] ?? '';
+      const name = lexiconTierName(mod.id, t.ilvl) ?? t.name;
       return [{
-        id: mod.id, text: mod.text ?? mod.id, type, family: mod.family,
+        id: mod.id, text: lexiconModText(mod.id) ?? mod.text ?? mod.id, type, family: mod.family,
         ...(mod.families && mod.families.length > 1 ? { families: mod.families } : {}),
         source: mod.alloy === true ? 'alloy' : 'perfect',
-        tiers: [{ display: 1, name: t.name, ilvl: t.ilvl, label: `${t.name} · ilvl ${t.ilvl}${range ? ` · ${range}` : ''}`, range, values }],
+        tiers: [{ display: 1, name, ilvl: t.ilvl, label: `${name} · ilvl ${t.ilvl}${range ? ` · ${range}` : ''}`, range, values }],
       }];
     });
   return [...build(base.pools.essence.prefixes, 'prefix'), ...build(base.pools.essence.suffixes, 'suffix')]
@@ -235,11 +241,12 @@ export function listDesecrated(data: PatchData, baseId: string): EngineMod[] {
       const t = mod.tiers[0]!;
       const values = (t.ranges ?? []).map(rollLabel).filter((v) => v !== '');
       const range = values[0] ?? '';
+      const name = lexiconTierName(mod.id, t.ilvl) ?? t.name;
       return [{
-        id: mod.id, text: mod.text ?? mod.id, type, family: mod.family,
+        id: mod.id, text: lexiconModText(mod.id) ?? mod.text ?? mod.id, type, family: mod.family,
         ...(mod.families && mod.families.length > 1 ? { families: mod.families } : {}),
         source: 'desecrated',
-        tiers: [{ display: 1, name: t.name, ilvl: t.ilvl, label: `desecrated · ilvl ${t.ilvl}${range ? ` · ${range}` : ''}`, range, values }],
+        tiers: [{ display: 1, name, ilvl: t.ilvl, label: `${getLocale() === 'zh-CN' ? '渎灵' : 'desecrated'} · ilvl ${t.ilvl}${range ? ` · ${range}` : ''}`, range, values }],
       }];
     });
   return [...build(base.pools.desecrated.prefixes, 'prefix'), ...build(base.pools.desecrated.suffixes, 'suffix')]

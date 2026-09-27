@@ -6,9 +6,11 @@ import AppUpdatedNotice from './AppUpdatedNotice';
 import FrontierView from './FrontierView';
 import AlternativesView from './AlternativesView';
 import StartFromItem from './StartFromItem';
+import ItemBudget from './ItemBudget';
 import TrueCostCard from './TrueCostCard';
 import CraftToSell from './CraftToSell';
 import type { LabCraft } from './useLabCraft';
+import { tr, useLocale } from '../../lib/i18n';
 
 /** The Plan tab's answers: the true cost and its route, the items to start from instead, the step routes. */
 const LabResults: React.FC<{ lab: LabCraft }> = ({ lab }) => {
@@ -17,6 +19,7 @@ const LabResults: React.FC<{ lab: LabCraft }> = ({ lab }) => {
     computing, compute, playOut, desecrationNeedsRare, normalTargets, excludedKeys, freeSlots, alts, altBudget,
     budget, sale, setSale, saleKey,
   } = lab;
+  useLocale();
   const effort = useEffort();
   // "Raise Search effort" is the app's standing answer to a solve that stopped early, and it is good
   // advice at every preset but the top one — where it points at a control with nothing above it. The
@@ -102,6 +105,24 @@ const LabResults: React.FC<{ lab: LabCraft }> = ({ lab }) => {
               real cost is at least this and may be higher. {finishAdvice}
             </p>
           )}
+          {markov.itemCapBound && (
+            <p className="text-[11px] text-muted-foreground">
+              {tr(
+                `Expected items are capped at ${markov.maxItems}. The plan spends more currency so it bins fewer bases. The cost above is that currency — the extra charge used to compare restarts is not included.`,
+                'ui.itemCapBoundNote',
+                { n: markov.maxItems ?? '' },
+              )}
+            </p>
+          )}
+          {markov.maxItems !== undefined && markov.itemCapMet === false && (
+            <p className="text-[11px] text-amber-700 dark:text-amber-300">
+              {tr(
+                `The item cap of ${markov.maxItems} was not met. Raise the cap, or raise Search effort and compute again.`,
+                'ui.itemCapUnmetShort',
+                { n: markov.maxItems },
+              )}
+            </p>
+          )}
           <p className="text-[11px] text-muted-foreground">
             The average spend to reach this target playing the optimal policy — it weighs orb strengths
             and side omens, recovers in place after a bad roll, and, when another base costs less than
@@ -121,6 +142,12 @@ const LabResults: React.FC<{ lab: LabCraft }> = ({ lab }) => {
           key={markovRun} markov={markov} engine={engine} rates={priceBasis(engine).rates}
           {...(solvedFor ? { solvedFor } : {})}
           carved={fractured.size > 0} ranAt={markovEffort} computing={computing} recompute={compute}
+        />
+      )}
+      {markov && !runErr && engine && markov.restartCost !== undefined && fractured.size === 0 && (
+        <ItemBudget
+          key={markovRun} markov={markov} engine={engine} rates={rates}
+          {...(solvedFor ? { solvedFor } : {})}
         />
       )}
 

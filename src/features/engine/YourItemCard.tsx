@@ -10,9 +10,11 @@ import PasteItem from './PasteItem';
 import BuilderColumn from './BuilderColumn';
 import { FOCUS_RING, selectCls } from './ui';
 import type { ItemCraft } from './useItemCraft';
+import { tr, useLocale } from '../../lib/i18n';
 
 /** The Item tab's first card: the item you hold — pasted or built — with its tiers and marks. */
 const YourItemCard: React.FC<{ it: ItemCraft }> = ({ it }) => {
+  useLocale();
   const {
     engine, bases, baseId, changeBase, level, setLevel, rarity, setRarity, category, runes, setRunes,
     clearItem, itemMods, target, plan, search, setSearch, filtered, prefixes, suffixes, capOf,
@@ -28,7 +30,7 @@ const YourItemCard: React.FC<{ it: ItemCraft }> = ({ it }) => {
       <div className="flex flex-wrap items-end gap-4">
         <BaseSelect bases={bases} value={baseId} onChange={changeBase} />
         <label className="flex flex-col gap-1">
-          <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Item level</span>
+          <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{tr('Item level', 'lab.level')}</span>
           <input
             type="number" min={1} max={100} value={level}
             onChange={(e) => setLevel(Math.max(1, Math.min(100, Number(e.target.value) || 1)))}
@@ -36,10 +38,10 @@ const YourItemCard: React.FC<{ it: ItemCraft }> = ({ it }) => {
           />
         </label>
         <label className="flex flex-col gap-1">
-          <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Rarity</span>
+          <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{tr('Rarity', 'ui.rarity')}</span>
           <select className={selectCls} value={rarity} onChange={(e) => setRarity(e.target.value as 'magic' | 'rare')}>
-            <option value="rare">Rare (3 + 3)</option>
-            <option value="magic">Magic (1 + 1)</option>
+            <option value="rare">{tr('Rare (3 + 3)', 'ui.rare')}</option>
+            <option value="magic">{tr('Magic (1 + 1)', 'ui.magic')}</option>
           </select>
         </label>
         <RunePicker category={category} value={runes} onChange={setRunes} />
@@ -58,20 +60,20 @@ const YourItemCard: React.FC<{ it: ItemCraft }> = ({ it }) => {
       </div>
 
       <div>
-        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">Mods already on your item</p>
-        <label htmlFor="item-mod-search" className="sr-only">Search modifiers to add to your item</label>
+        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">{tr('Mods already on your item', 'ui.onItem')}</p>
+        <label htmlFor="item-mod-search" className="sr-only">{tr('Search modifiers to add to your item', 'ui.searchItem')}</label>
         <input
           id="item-mod-search"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search modifiers to add to your item…"
+          placeholder={tr('Search modifiers to add to your item…', 'ui.searchItem')}
           className={`${selectCls} w-full mb-2`}
         />
         {/* Stacks on a phone. A bare `flex` kept both columns side by side at every width, so
             on a narrow screen each got half of it and the mod text was crushed to nothing. */}
         <div className="flex flex-col sm:flex-row gap-4">
-          <BuilderColumn title="Prefixes" list={filtered.prefixes} count={prefixes.length} cap={capOf('prefix')} occupiedFamilies={occupiedFamilies} onAdd={addItemMod} />
-          <BuilderColumn title="Suffixes" list={filtered.suffixes} count={suffixes.length} cap={capOf('suffix')} occupiedFamilies={occupiedFamilies} onAdd={addItemMod} />
+          <BuilderColumn title={tr('Prefixes', 'ui.prefix')} list={filtered.prefixes} count={prefixes.length} cap={capOf('prefix')} occupiedFamilies={occupiedFamilies} onAdd={addItemMod} />
+          <BuilderColumn title={tr('Suffixes', 'ui.suffix')} list={filtered.suffixes} count={suffixes.length} cap={capOf('suffix')} occupiedFamilies={occupiedFamilies} onAdd={addItemMod} />
         </div>
       </div>
 
@@ -103,8 +105,8 @@ const YourItemCard: React.FC<{ it: ItemCraft }> = ({ it }) => {
                   >
                     {m.tiers.map((ti) => <option key={ti.display} value={ti.display}>{ti.label}</option>)}
                   </select>
-                  {isDesecrated && <span className="rounded bg-rose-500/20 px-1 text-[10px] text-rose-700 dark:text-rose-300">desecrated</span>}
-                  {isFractured && <span className="rounded bg-amber-500/20 px-1 text-[10px] text-amber-700 dark:text-amber-300">fractured</span>}
+                  {isDesecrated && <span className="rounded bg-rose-500/20 px-1 text-[10px] text-rose-700 dark:text-rose-300">{tr('desecrated', 'ui.desecrated')}</span>}
+                  {isFractured && <span className="rounded bg-amber-500/20 px-1 text-[10px] text-amber-700 dark:text-amber-300">{tr('fractured', 'ui.fractured')}</span>}
                   <button
                     onClick={() => toggleFractured(m.id)}
                     aria-pressed={isFractured}

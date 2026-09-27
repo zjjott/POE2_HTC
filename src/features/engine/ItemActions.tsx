@@ -7,18 +7,20 @@ import ItemFullPlan from './ItemFullPlan';
 import ItemResults from './ItemResults';
 import { FOCUS_RING } from './ui';
 import { useItemCraft } from './useItemCraft';
+import { tr, useLocale } from '../../lib/i18n';
 
 export { ItemWorth } from './ItemWorth';
 
 /** The "I have an item" tab: the item you hold, then either the Quick currency check or a full plan. */
 const ItemActions: React.FC = () => {
   const it = useItemCraft();
+  useLocale();
   const { engine, loadErr, subMode, setSubMode, item, checkAddable, itemMods, rates } = it;
 
   if (loadErr) {
     return (
       <Card className="p-6">
-        <p className="text-destructive font-medium">Failed to load engine data</p>
+        <p className="text-destructive font-medium">{tr('Failed to load engine data', 'ui.loadFail')}</p>
         <p className="text-sm text-muted-foreground mt-1">{loadErr}</p>
       </Card>
     );
@@ -27,7 +29,7 @@ const ItemActions: React.FC = () => {
     // Same wrap, same reason as EngineLab's loading state — see the note there.
     return (
       <div className="flex items-center gap-3 p-8 text-muted-foreground">
-        <Spinner /><span>Loading patch data…</span>
+        <Spinner /><span>{tr('Loading patch data…', 'lab.loading')}</span>
       </div>
     );
   }
@@ -46,14 +48,14 @@ const ItemActions: React.FC = () => {
           onClick={() => setSubMode('check')}
           aria-pressed={subMode === 'check'}
         >
-          Quick currency check
+          {tr('Quick currency check', 'ui.quickCheck')}
         </button>
         <button
           className={`${subTabCls(subMode === 'plan')} ${FOCUS_RING}`}
           onClick={() => setSubMode('plan')}
           aria-pressed={subMode === 'plan'}
         >
-          Full plan to a target
+          {tr('Full plan to a target', 'ui.fullPlan')}
         </button>
       </div>
 

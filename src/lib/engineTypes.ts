@@ -425,6 +425,8 @@ export interface EngineHolding {
   /** The same slots as modifier ids — each slot the alternatives any one of which fills it — for a trade search. */
   readonly positions: readonly (readonly string[])[];
   readonly cost: number;
+  /** Expected items consumed to finish from here, this one included. Absent without a restart. */
+  readonly items?: number;
   /** A Magic and a Rare holding the same mods finish differently — only the Magic one can Regal. */
   readonly rarity: 'magic' | 'rare';
   /** The solver's state for this item, so the Lab can draw the route from it. */
@@ -486,6 +488,19 @@ export interface EngineMarkovResult {
    * player can edit after solving.
    */
   readonly restartCost?: number;
+  /**
+   * Expected bases a from-white craft consumes, restarts included. Absent when the craft cannot start
+   * over, or the solve did not cost its policy in closed form.
+   */
+  readonly inputItems?: number;
+  /**
+   * The item cap this solve was asked to meet, and whether the published policy does.
+   * `itemCapBound` means the cap changed the policy: restarts were charged extra until the
+   * expected count fitted, and `expectedCost` is that policy's real currency spend.
+   */
+  readonly maxItems?: number;
+  readonly itemCapMet?: boolean;
+  readonly itemCapBound?: boolean;
   /**
    * The solved policy over the whole lattice, opaque to the UI: `routeFor` walks it to draw the route
    * from any starting item, and `stepFor` reads it one move at a time (Craft along), without solving

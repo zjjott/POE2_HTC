@@ -1,4 +1,5 @@
 import React from 'react';
+import { tr } from '../../lib/i18n';
 import { cn } from '../../lib/utils';
 import { standInFilters, type StandIn } from '../../lib/tablets';
 
@@ -44,11 +45,11 @@ export const StandInTip: React.FC<{
               {url && (
                 <a
                   href={url} target="_blank" rel="noopener noreferrer"
-                  aria-label={`Search on trade for ${standInName(s)}`}
-                  title="Opens the trade site: Magic, 10 uses, holding only this side's modifier, instant buyout, cheapest first"
+                  aria-label={tr(`Search on trade for ${standInName(s)}`, 'ui.searchTradeFor', { name: standInName(s) })}
+                  title={tr('Opens the trade site: Magic, 10 uses, holding only this side\'s modifier, instant buyout, cheapest first', 'ui.searchTradeMagic')}
                   className={cn('rounded border border-border px-1.5 py-0.5 text-xs hover:border-primary/60 hover:text-foreground', FOCUS)}
                 >
-                  Search on trade
+                  {tr('Search on trade', 'ui.searchTrade')}
                 </a>
               )}
             </li>

@@ -10,6 +10,10 @@
 // from Exiled Exchange 2's MIT data). Where one modifier resolves to several ids, the search asks for ANY
 // of them — see `ambiguous` there — which can list a near-identical modifier the player did not ask for.
 
+import { useSyncExternalStore } from 'react';
+import { getLocale } from './i18n.ts';
+import { lexiconBaseName } from './lexicon.ts';
+
 /** One modifier's trade ids, as `trade-stats.json` records them. */
 export interface TradeStat {
   readonly ids: readonly string[];
@@ -40,6 +44,9 @@ export interface TradeSearch {
 }
 
 const HOST = 'https://www.pathofexile.com';
+/** 国服交易。联赛名写在路径里；查询本体是 gzip 后再做 URL-safe base64，不是 `?q=`。 */
+const CN_HOST = 'https://poe.game.qq.com';
+const CN_LEAGUE = '周年庆巅峰挑战';
 
 /**
  * A tablet is spent a use at a time, and a fresh one has 10. A used tablet is a different item at a
@@ -55,7 +62,10 @@ export const FULL_USES = { id: 'pseudo.pseudo_number_of_uses_remaining', value: 
  * with several ids becomes its own `count ≥ 1` group: the trade site has no "this stat under any of its
  * spellings" filter, and a count group is how the site's own UI expresses that.
  */
-export function tradeUrl({ league, baseName, category, rarity, require = [], stats }: TradeSearch): string {
+function tradeQuery({ baseName, category, rarity, require = [], stats }: TradeSearch): {
+  query: Record<string, unknown>;
+  sort: { price: 'asc' };
+} {
   const filter = (s: TradeStat, i: number) => {
     const value = s.values?.[i] ?? s.value;
     return { id: s.ids[i]!, ...(value ? { value } : {}), disabled: false };
@@ -70,7 +80,7 @@ export function tradeUrl({ league, baseName, category, rarity, require = [], sta
     ...(category ? { category: { option: category } } : {}),
     ...(rarity ? { rarity: { option: rarity } } : {}),
   };
-  const query = {
+  return {
     query: {
       // Instant buyout: a listing you can buy without the seller online, at the price it shows — the
       // only price a player can act on without a whisper, so the one worth typing back in.
@@ -81,5 +91,83 @@ export function tradeUrl({ league, baseName, category, rarity, require = [], sta
     },
     sort: { price: 'asc' },
   };
-  return `${HOST}/trade2/search/poe2/${encodeURIComponent(league)}?q=${encodeURIComponent(JSON.stringify(query))}`;
+}
+
+function intlUrl(league: string, wrapped: ReturnType<typeof tradeQuery>): string {
+  return `${HOST}/trade2/search/poe2/${encodeURIComponent(league)}?q=${encodeURIComponent(JSON.stringify(wrapped))}`;
+}
+
+/** gzip + URL-safe base64, the suffix poe.game.qq.com puts after the league. */
+async function gzipBase64Url(json: string): Promise<string> {
+  const cs = new CompressionStream('gzip');
+  const writer = cs.writable.getWriter();
+  await writer.write(new TextEncoder().encode(json));
+  await writer.close();
+  const buf = new Uint8Array(await new Response(cs.readable).arrayBuffer());
+  let bin = '';
+  for (const b of buf) bin += String.fromCharCode(b);
+  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+const cnCache = new Map<string, string>();
+const cnListeners = new Set<() => void>();
+
+function cnKey(search: TradeSearch): string {
+  const named = search.baseName ? { ...search, baseName: lexiconBaseName(search.baseName) } : search;
+  return JSON.stringify(tradeQuery(named).query);
+}
+
+/**
+ * 国服链接。查询是示例里那种路径后缀：把 query 对象 gzip 后做 base64，而不是 `?q=`。
+ * 第一次调用先返回空串，压缩完成后通知 `useTradeUrl` 再渲染。
+ */
+export async function cnTradeUrl(search: TradeSearch): Promise<string> {
+  const key = cnKey(search);
+  const hit = cnCache.get(key);
+  if (hit) return hit;
+  const suffix = await gzipBase64Url(key);
+  const url = `${CN_HOST}/trade2/search/poe2/${encodeURIComponent(CN_LEAGUE)}/${suffix}`;
+  cnCache.set(key, url);
+  for (const l of cnListeners) l();
+  return url;
+}
+
+function subscribeCn(l: () => void): () => void {
+  cnListeners.add(l);
+  return () => cnListeners.delete(l);
+}
+
+/**
+ * The URL for "this item, with these modifiers, instant buyout, cheapest first".
+ *
+ * A single-id modifier joins one `and` group, since every one of them has to be on the item. A modifier
+ * with several ids becomes its own `count ≥ 1` group: the trade site has no "this stat under any of its
+ * spellings" filter, and a count group is how the site's own UI expresses that.
+ *
+ * 简体中文走腾讯国服，联赛固定为「周年庆巅峰挑战」。压缩还没完成时返回空串。
+ */
+function cachedCn(search: TradeSearch): string {
+  const key = cnKey(search);
+  const hit = cnCache.get(key);
+  if (!hit) void cnTradeUrl(search);
+  return hit ?? '';
+}
+
+export function tradeUrl(search: TradeSearch, realm?: 'cn'): string {
+  if (realm === 'cn' || getLocale() === 'zh-CN') return cachedCn(search);
+  return intlUrl(search.league, tradeQuery(search));
+}
+
+/** Re-render once the 国服 gzip suffix is ready. English URLs are ready on the first render. */
+export function useTradeUrl(search: TradeSearch | null, realm?: 'cn'): string {
+  return useSyncExternalStore(
+    subscribeCn,
+    () => (search ? tradeUrl(search, realm) : ''),
+    () => (search ? tradeUrl(search, realm) : ''),
+  );
+}
+
+/** Re-render when any 国服 link finishes compressing. For a list of searches, call `tradeUrl` beside this. */
+export function useTradeTick(): void {
+  useSyncExternalStore(subscribeCn, () => cnCache.size, () => cnCache.size);
 }

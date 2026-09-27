@@ -10,6 +10,7 @@
 
 import type { SolveProgress, SolveRequest, SolveResult } from './solve.ts';
 import type { WorkerRequest, WorkerResponse } from './engine.worker.ts';
+import { getLocale } from './i18n.ts';
 import { reportError } from './sentry.ts';
 
 /** Thrown into the rejected promise when a solve is cancelled or superseded. Not a failure. */
@@ -184,7 +185,7 @@ export function solve(req: SolveRequest, onProgress?: (p: SolveProgress) => void
   const promise = new Promise<SolveResult>((resolve, reject) => { settle = { resolve, reject }; });
   inFlight = { id, ...settle!, ...(onProgress ? { onProgress } : {}) };
 
-  worker.postMessage({ id, req } satisfies WorkerRequest);
+  worker.postMessage({ id, req, locale: getLocale() } satisfies WorkerRequest);
   return { promise, cancel: cancelInFlight };
 }
 

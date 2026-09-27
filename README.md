@@ -1,5 +1,7 @@
 # POE2 How To Craft
 
+中文说明：[README.zh_cn.md](README.zh_cn.md)
+
 <div align="center">
 
 ![CI](https://github.com/Dboire9/POE2_HTC/actions/workflows/ci.yml/badge.svg)

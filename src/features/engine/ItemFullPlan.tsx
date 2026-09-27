@@ -13,6 +13,7 @@ import { FreeSlotNote, FreeSlotRows, withSpare } from './FreeSlots';
 import { GearTradeLink } from './GearTradeLink';
 import RuneHint from './RuneHint';
 import { FOCUS_RING, selectCls } from './ui';
+import { tr, useLocale } from '../../lib/i18n';
 import type { ItemCraft } from './useItemCraft';
 
 /**
@@ -33,12 +34,13 @@ const ItemFullPlan: React.FC<{ it: ItemCraft }> = ({ it }) => {
     targetState, heldTier, patchTarget, removeTargetMod, startAlternative, spare, setSpare, computing,
     progress, cancel, compute, blockedBy, tookMs, clearPlan,
   } = it;
+  useLocale();
   return (
     <Card className="p-4 space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h3 className="text-sm font-bold">What should the item end up as?</h3>
+        <h3 className="text-sm font-bold">{tr('What should the item end up as?', 'ui.endAs')}</h3>
         <Button variant="outline" size="sm" onClick={copyItemToTarget} disabled={itemMods.length === 0}>
-          Copy my current mods
+          {tr('Copy my current mods', 'ui.copyMods')}
         </Button>
       </div>
       <p className="text-[11px] text-muted-foreground">

@@ -3,6 +3,7 @@ import type { EngineMarkovResult, EnginePolicyNode, PolicyMod } from '../../lib/
 import { formatIn, pickUnit, type CostUnit, type Rates } from '../../lib/currency';
 import { changesBetween, mainLine, type JunkChange, type StepChanges } from '../../lib/policyPath';
 import { cn } from '../../lib/utils';
+import { tr, useLocale } from '../../lib/i18n';
 import type { Spare } from '../../../packages/optimizer/src/slots.ts';
 import { NO_SPARE } from '../../../packages/optimizer/src/slots.ts';
 
@@ -60,15 +61,19 @@ function stateLabel(nd: EnginePolicyNode): string {
   // count means completely different things on each rung — a 2-mod Magic item cannot take an Exalt at
   // all. Omitted on a Rare, which is every from-item craft and would otherwise repeat "Rare" on every
   // box for no information.
-  const parts = nd.rarity === 'rare' ? [] : [nd.rarity === 'normal' ? 'white base' : 'magic'];
-  parts.push(`${kept} mod${kept === 1 ? '' : 's'}`);
-  if (nd.blocked.length > 0) parts.push(`${nd.blocked.length} blocked`);
-  if (junk > 0) parts.push(`+${junk} junk`);
+  const parts = nd.rarity === 'rare' ? [] : [nd.rarity === 'normal' ? tr('white base', 'st.white') : tr('magic', 'st.magic')];
+  parts.push(kept === 1 ? tr('1 mod', 'st.mod1') : tr(`${kept} mods`, 'st.mods', { n: kept }));
+  if (nd.blocked.length > 0) {
+    parts.push(nd.blocked.length === 1
+      ? tr('1 blocked', 'st.blocked1')
+      : tr(`${nd.blocked.length} blocked`, 'st.blocked', { n: nd.blocked.length }));
+  }
+  if (junk > 0) parts.push(tr(`+${junk} junk`, 'st.junk', { n: junk }));
   // The mod a Desecration placed, called out wherever it landed: it blocks desecrating again until it
   // is removed, which is what makes this state different from an otherwise identical one. A flagged
   // JUNK mod is already inside the junk count above — the note says it is marked, not that it is extra.
-  if (nd.desecratedJunk) parts.push('1 junk desecrated');
-  else if (nd.desecratedTarget) parts.push('desecrated');
+  if (nd.desecratedJunk) parts.push(tr('1 junk desecrated', 'st.junkDes'));
+  else if (nd.desecratedTarget) parts.push(tr('desecrated', 'st.desecrated'));
   return parts.join(' · ');
 }
 
@@ -695,13 +700,13 @@ const FullGraph: React.FC<{
                 strokeWidth={isSelected ? 3 : node.isStart || node.isGoal ? 2 : 1}
               />
               {node.isGoal ? (
-                <text x={x + W / 2} y={y + H / 2 + 4} textAnchor="middle" className="fill-emerald-600 dark:fill-emerald-400 text-[12px] font-semibold">✓ target</text>
+                <text x={x + W / 2} y={y + H / 2 + 4} textAnchor="middle" className="fill-emerald-600 dark:fill-emerald-400 text-[12px] font-semibold">{tr('✓ target', 'ui.targetMark')}</text>
               ) : node.isRestart ? (
                 // The end of a route from a bought item, not a state on it: the policy bins the item and
                 // what follows is the from-scratch plan, which the Lab already shows. Its cost is that
                 // plan's — what finishing from a fresh base costs.
                 <text x={x + W / 2} y={y + H / 2 + 4} textAnchor="middle" className="fill-amber-600 dark:fill-amber-400 text-[12px] font-semibold">
-                  ↺ start over · {fmtCost(node.expectedCost)}
+                  {tr(`↺ start over · ${fmtCost(node.expectedCost)}`, 'ui.startOverBox', { cost: fmtCost(node.expectedCost) })}
                 </text>
               ) : (
                 // HTML in a <foreignObject>, not SVG <text>. SVG text neither wraps nor truncates, so
@@ -758,8 +763,9 @@ const PolicyGraph: React.FC<{
   /** Show every cost in this unit rather than the one the largest cost suggests — the Tablets tab's choice. */
   unit?: CostUnit;
 }> = ({
-  result, rates, startLabel = 'Your item', spare = NO_SPARE, unit: chosenUnit,
+  result, rates, startLabel = tr('Your item', 'ui.yourItem'), spare = NO_SPARE, unit: chosenUnit,
 }) => {
+  useLocale();
   const [showAll, setShowAll] = React.useState(false);
   if (!result.applicable || !result.feasible || result.nodes.length === 0) return null;
   // One unit across BOTH views, from the largest node cost — these are all the same quantity
@@ -810,7 +816,7 @@ const PolicyGraph: React.FC<{
               aria-pressed={!showAll}
               className={`${viewCls(!showAll)} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring`}
             >
-              The route
+              {tr('The route', 'ui.theRoute')}
             </button>
             <button
               type="button"
@@ -818,23 +824,23 @@ const PolicyGraph: React.FC<{
               aria-pressed={showAll}
               className={`${viewCls(showAll)} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring`}
             >
-              Full graph · {result.nodes.length} states
+              {tr(`Full graph · ${result.nodes.length} states`, 'ui.fullGraph', { n: result.nodes.length })}
             </button>
           </div>
           <span className="text-[11px] text-muted-foreground">
             {showAll
-              ? 'Every state the policy can reach, and how it moves between them. Click a box for its detail.'
-              : 'The way most crafts that finish go. Switch to the graph to see what happens when a roll misses.'}
+              ? tr('Every state the policy can reach, and how it moves between them. Click a box for its detail.', 'ui.graphHint')
+              : tr('The way most crafts that finish go. Switch to the graph to see what happens when a roll misses.', 'ui.routeHint')}
           </span>
         </div>
       )}
 
       {!reachesTarget && (
         <p className="rounded-md border border-amber-500/50 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-700 dark:text-amber-300">
-          <strong>No route to show yet.</strong> The solver stopped before its policy settled, and what
-          it had worked out does not reach your target — every state it explored still needs more mods
-          than it found a way to add. The states below are real, but they are a dead end, not a plan.
-          Raise <strong>Search effort</strong> and run it again.
+          <strong>{tr('No route to show yet.', 'ui.noRouteYet')}</strong>{' '}
+          {tr('The solver stopped before its policy settled, and what it had worked out does not reach your target — every state it explored still needs more mods than it found a way to add. The states below are real, but they are a dead end, not a plan. Raise', 'ui.noRouteBody')}{' '}
+          <strong>{tr('Search effort', 'ui.searchEffort')}</strong>
+          {tr(' and run it again.', 'ui.noRouteAgain')}
         </p>
       )}
 
@@ -848,17 +854,17 @@ const PolicyGraph: React.FC<{
                 {describeStep(s.changes) || `${s.node.isStart ? startLabel.toLowerCase() : stateLabel(s.node)} → ${stateLabel(s.next)}`}
               </span>
               <span className="tabular-nums text-xs">
-                <span className="text-emerald-600 dark:text-emerald-400">{pct(s.advance)} onward</span>
-                {s.lands > 0 && <span className="text-emerald-600 dark:text-emerald-400"> · {pct(s.lands)} finishes it</span>}
-                {s.repeats > 0 && <span className="text-muted-foreground"> · {pct(s.repeats)} no change, again</span>}
+                <span className="text-emerald-600 dark:text-emerald-400">{tr(`${pct(s.advance)} onward`, 'ui.onward', { p: pct(s.advance) })}</span>
+                {s.lands > 0 && <span className="text-emerald-600 dark:text-emerald-400">{tr(` · ${pct(s.lands)} finishes it`, 'ui.finishesIt', { p: pct(s.lands) })}</span>}
+                {s.repeats > 0 && <span className="text-muted-foreground">{tr(` · ${pct(s.repeats)} no change, again`, 'ui.noChange', { p: pct(s.repeats) })}</span>}
                 {s.brick > 0 && (
-                  <span className="text-amber-600 dark:text-amber-400"> · {pct(s.brick)} back</span>
+                  <span className="text-amber-600 dark:text-amber-400">{tr(` · ${pct(s.brick)} back`, 'ui.back', { p: pct(s.brick) })}</span>
                 )}
               </span>
               <span className="tabular-nums text-xs text-muted-foreground w-20 text-right">{fmtCost(s.node.expectedCost)}</span>
             </li>
           ))}
-          <li className="px-3 py-2 text-sm font-semibold text-emerald-600 dark:text-emerald-400">✓ target</li>
+          <li className="px-3 py-2 text-sm font-semibold text-emerald-600 dark:text-emerald-400">{tr('✓ target', 'ui.targetMark')}</li>
         </ol>
       )}
 
@@ -870,10 +876,7 @@ const PolicyGraph: React.FC<{
           which renders the same graph. */}
       {showGraph && (
         <p className="text-[11px] text-muted-foreground">
-          Each square is an item state, from {startLabel.toLowerCase()} (left) to the target (right). Solid arrows are
-          progress; dashed amber arrows are <strong>bricks</strong> — a bad roll (a miss, or a target
-          rolled <strong>below its tier</strong> so its family is blocked) that sends you back a step,
-          which the policy then digs out of.
+          {tr(`Each square is an item state, from ${startLabel.toLowerCase()} (left) to the target (right). Solid arrows are progress; dashed amber arrows are bricks — a bad roll (a miss, or a target rolled below its tier so its family is blocked) that sends you back a step, which the policy then digs out of.`, 'ui.graphLegend', { start: startLabel.toLowerCase() })}
         </p>
       )}
 

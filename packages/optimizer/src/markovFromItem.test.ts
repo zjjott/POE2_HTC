@@ -478,6 +478,42 @@ describe('markovFromItem — from a white base', () => {
     expect(played.has('regal')).toBe(true);
   });
 
+  it('records how many bases the restart policy expects to consume', () => {
+    const r = markovFromItem(real, rp, white, targets, { restartCost: 0, solver: 'policy' });
+    // 1/(1−q), from the closed-form evaluation. Value iteration never writes q, so the default
+    // solver leaves this absent — drop the copy and a from-white policy result can no longer say
+    // how many items it uses.
+    expect(r.inputItems).toBeGreaterThanOrEqual(1);
+    expect(r.holdings?.every((h) => h.items !== undefined && h.items >= 1)).toBe(true);
+  });
+
+  it('spends more currency so the expected number of bases stays within a cap', () => {
+    const open = markovFromItem(real, rp, white, targets, { restartCost: 0, solver: 'policy' });
+    const openItems = open.inputItems!;
+    // A free base bins most misses. If this craft no longer does, the cap below proves nothing.
+    expect(openItems).toBeGreaterThan(5);
+    const cap = Math.max(2, Math.floor(openItems / 4));
+    expect(cap).toBeLessThan(openItems);
+    const capped = markovFromItem(real, rp, white, targets, { restartCost: 0, solver: 'policy', maxItems: cap });
+    expect(capped.itemCapMet).toBe(true);
+    expect(capped.itemCapBound).toBe(true);
+    expect(capped.inputItems).toBeLessThanOrEqual(cap);
+    expect(capped.expectedCost).toBeGreaterThan(open.expectedCost);
+    // The surcharge is a search device. A restart that survives is still priced at the real base cost.
+    const restartCost = capped.nodes.find((nd) => nd.action?.currency === 'restart')?.actionCost;
+    if (restartCost !== undefined) expect(restartCost).toBe(0);
+    const restartsOf = (policy: typeof open.policy): number =>
+      [...policy.values()].filter((a) => a.currency === 'restart').length;
+    // Re-argmin at the real price would publish the uncapped policy again, and this would not drop.
+    expect(restartsOf(capped.policy)).toBeLessThan(restartsOf(open.policy));
+    const loose = markovFromItem(real, rp, white, targets, {
+      restartCost: 0, solver: 'policy', maxItems: Math.ceil(openItems) + 10,
+    });
+    expect(loose.itemCapMet).toBe(true);
+    expect(loose.itemCapBound).toBeUndefined();
+    expect(loose.expectedCost).toBeCloseTo(open.expectedCost, 6);
+  });
+
   /**
    * The restart action is a CORRECTNESS requirement here, not a refinement.
    *

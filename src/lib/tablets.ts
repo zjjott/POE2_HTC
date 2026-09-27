@@ -16,6 +16,7 @@ import { FLAG_NONE, encodeState } from '../../packages/optimizer/src/markovState
 import morce from '../../data/tablets/morce-faster.json';
 import tradeStats from '../../data/tablets/trade-stats.json';
 import valuable from '../../data/tablets/valuable.json';
+import { lexiconBaseName, lexiconModText } from './lexicon.ts';
 
 /** Whose rolling data every number on this tab rests on. Shown wherever the odds are. */
 export const ODDS_CREDIT = {
@@ -59,12 +60,12 @@ export function listTablets(data: PatchData): TabletBase[] {
         return ids
           .map((id): TabletMod => {
             const mod = resolveMod(data, id);
-            return { id, text: mod.text ?? id, side: type, share: mod.tiers[0]!.weight / total, seen: seenOf(id) };
+            return { id, text: lexiconModText(id) ?? mod.text ?? id, side: type, share: mod.tiers[0]!.weight / total, seen: seenOf(id) };
           })
           .sort((x, y) => y.share - x.share);
       };
       return {
-        id: b.id, name: b.name,
+        id: b.id, name: lexiconBaseName(b.name),
         prefixes: side(b.pools.normal.prefixes, 'prefix'),
         suffixes: side(b.pools.normal.suffixes, 'suffix'),
       };

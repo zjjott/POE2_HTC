@@ -86,6 +86,12 @@ export type SolveRequest =
        *  Only reaches the model on a from-WHITE craft or a `rebuyable` item: a held or carved one cannot be
        *  restarted. */
       readonly baseCost?: number;
+      /**
+       * Expected bases a from-white (or rebuyable) craft may consume, restarts included.
+       * Enforced in the MDP (`MarkovOptions.maxItems`). Absent means no cap. A held or carved
+       * item cannot restart, so the number is ignored there.
+       */
+      readonly maxItems?: number;
       /** Targets with pins applied, for the budget search. Defaults to `targets`. */
       readonly want?: readonly AltTargetInput[];
       /**
@@ -446,6 +452,7 @@ export function runSolve(eng: Engine, req: SolveRequest, onProgress?: (p: SolveP
     // a white base without solving again, and Craft along follows the plan move by move — which a carved
     // item's craft needs as much as a white base's. Only a white base (or a rebuyable item) can restart.
     ...(fromWhite || req.rebuyable ? { restartCost: req.baseCost ?? WHITE_BASE_COST } : {}),
+    ...(req.maxItems !== undefined && (fromWhite || req.rebuyable) ? { maxItems: req.maxItems } : {}),
     keepRoutes: true,
     ...(req.fillOnFinish ? { fillOnFinish: true } : {}),
     ...(req.smallLattice ? { heuristicSeed: true, exactEvaluation: true } : {}),

@@ -1,0 +1,20 @@
+Ring
+Emerald Ring
+Crafted: true
+Prefix: {range:0.5}IncreasedAccuracy6
+Prefix: {range:1}IncreasedMana12
+Prefix: {range:1}LightningDamagePercent3
+Suffix: {range:0.5}CastSpeedJewellery3
+Suffix: {range:0.5}GlobalIncreaseSpellSkillGemLevel1
+Suffix: {range:0.5}AllResistances3
+Catalyst: Neural
+CatalystQuality: 20
+LevelReq: 60
+Implicits: 1
+{tags:attack}{range:0.5}+(120-160) to Accuracy Rating
+17% increased Lightning Damage
++202 to Accuracy Rating
++214 to maximum Mana
++1 to Level of all Spell Skills
+17% increased Cast Speed
++10% to all Elemental Resistances

@@ -12,9 +12,10 @@ import {
 import { addMine, hide, prefsFor, readWatch, removeMine, unhideAll, type WatchStore } from '../../lib/tabletWatch';
 import { readPrices, readShownUnit, writePrice, writeShownUnit, type PriceEntry, type TypedPrice } from '../../lib/tabletPrices';
 import { priceUnits, type CostUnit } from '../../lib/currency';
-import { FULL_USES, tradeUrl } from '../../lib/tradeLink';
+import { FULL_USES, tradeUrl, useTradeTick } from '../../lib/tradeLink';
 import { toExcludedKeys, useExclusions } from '../../lib/currencyPrefs';
 import { limitsFor, useEffort } from '../../lib/searchEffort';
+import { tr, useLocale } from '../../lib/i18n';
 import SolveProgressBar from '../engine/SolveProgress';
 import { useEngine } from '../engine/useEngine';
 import { useSolveRunner } from '../engine/useSolveRunner';
@@ -65,7 +66,9 @@ const TabletsTab: React.FC = () => {
   // a fraction of a second; without it they stopped at a bound.
   const effort = useEffort();
 
-  const tablets = useMemo(() => (engine ? listTablets(engine.data) : []), [engine]);
+  const locale = useLocale();
+  useTradeTick();
+  const tablets = useMemo(() => (engine ? listTablets(engine.data) : []), [engine, locale]);
   const tablet = tablets.find((t) => t.id === tabletId) ?? tablets[0];
   const ruledOut = useMemo(() => (engine ? ruledOutBy(engine.data, chosen) : new Map<string, string>()), [engine, chosen]);
   const basis = engine ? priceBasis(engine) : undefined;
@@ -235,7 +238,7 @@ const TabletsTab: React.FC = () => {
                 ? `Opens the trade site: Normal ${tablet.name}s with all 10 uses, instant buyout, cheapest first`
                 : `Opens the trade site: Magic ${tablet.name}s holding only a ${startKind}, all 10 uses, instant buyout, cheapest first`}
             >
-              {startKind === 'plain' ? 'Find a plain one on trade' : 'Find one on trade'}
+              {startKind === 'plain' ? tr('Find a plain one on trade', 'ui.findPlain') : tr('Find one on trade', 'ui.findOne')}
             </a>
           )}
           <Button onClick={() => compute()} disabled={computing || chosen.length === 0} size="lg">

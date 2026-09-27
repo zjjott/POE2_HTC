@@ -27,6 +27,11 @@ export interface Holding {
   readonly present: readonly (readonly string[])[];
   /** Expected cost to finish from a clean item holding exactly these. Carries the result's `bound`. */
   readonly cost: number;
+  /**
+   * Expected number of items consumed to finish from here: this one, plus every later base the plan
+   * bins back to. Absent when the solve had no restart, or its values were not costed in closed form.
+   */
+  readonly items?: number;
   /** A Magic and a Rare holding the same mods finish differently — only one of them can Regal. */
   readonly rarity: 'magic' | 'rare';
   /** The lattice state this row reads, so a route can be drawn from it (`routeFrom`). */
@@ -41,6 +46,8 @@ export interface StartArgs {
   readonly encode: StateEncoder;
   /** V at a state, or undefined where the lattice has no such state. */
   readonly valueAt: (key: StateKey) => number | undefined;
+  /** Expected items consumed from that state. Absent ⇒ rows carry no `items`. */
+  readonly itemsAt?: (key: StateKey) => number | undefined;
   /** Obstacle positions (markovSiblings.ts) — never a modifier anyone buys an item for. Absent ⇒ none. */
   readonly obstacles?: number;
 }
@@ -71,12 +78,12 @@ export interface StartArgs {
  * may carry an infinity. Ordered by size, then cost, then key, so the output is the same every run.
  * The empty Rare and the finished item are both rows — the baseline and the end of the scale.
  */
-export function startCandidates({ list, slotMasks, rarities, encode, valueAt, obstacles = 0 }: StartArgs): Holding[] {
+export function startCandidates({ list, slotMasks, rarities, encode, valueAt, itemsAt, obstacles = 0 }: StartArgs): Holding[] {
   const n = list.length;
   const idsOf = (i: number): readonly string[] => list[i]!.mods.map((m) => m.mod.id);
   const source = (i: number): string => representative(list[i]!).source;
 
-  interface Group { readonly rarity: 'magic' | 'rare'; readonly cost: number; masks: number }
+  interface Group { readonly rarity: 'magic' | 'rare'; readonly cost: number; readonly items?: number; masks: number }
   const groups = new Map<StateKey, Group>();
   for (const rarity of rarities) {
     if (rarity === 'normal') continue; // a Normal item holds nothing
@@ -96,9 +103,10 @@ export function startCandidates({ list, slotMasks, rarities, encode, valueAt, ob
       const key = encode(mask, 0, 0, 0, flag, rarity);
       const cost = valueAt(key);
       if (cost === undefined || !Number.isFinite(cost)) continue;
+      const items = itemsAt?.(key);
       const g = groups.get(key);
       if (g) g.masks |= mask;
-      else groups.set(key, { rarity, cost, masks: mask });
+      else groups.set(key, { rarity, cost, masks: mask, ...(items !== undefined && Number.isFinite(items) ? { items } : {}) });
     }
   }
   // The union of every spelling's positions, one entry per slot — "Cold or Lightning" — in the order
@@ -116,7 +124,7 @@ export function startCandidates({ list, slotMasks, rarities, encode, valueAt, ob
       for (let j = 0; j < n; j++) if (has(slotMasks[slot]!, j) && has(g.masks, j)) ids.push(...idsOf(j));
       present.push(ids);
     }
-    rows.push({ present, cost: g.cost, rarity: g.rarity, key });
+    rows.push({ present, cost: g.cost, rarity: g.rarity, key, ...(g.items !== undefined ? { items: g.items } : {}) });
   }
   return rows.sort((a, b) => a.present.length - b.present.length || a.cost - b.cost
     || (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));

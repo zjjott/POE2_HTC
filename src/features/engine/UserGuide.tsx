@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { DISCORD_URL } from './ReportProblem.tsx';
 import { openGuide } from '../../lib/guideRoute.ts';
 import { useMode } from '../../lib/workspace';
+import { tr, useLocale } from '../../lib/i18n';
 
 /**
  * The short orientation panel above the tabs — collapsed by default, and the app's only signpost to
@@ -113,6 +114,7 @@ const ItemSteps: React.FC = () => (
 
 const UserGuide: React.FC = () => {
   const [open, setOpen] = useState(false);
+  useLocale();
   const [mode] = useMode();
   const onItem = mode === 'item';
 
@@ -125,10 +127,10 @@ const UserGuide: React.FC = () => {
         aria-expanded={open}
       >
         <span className={LABEL}>
-          <span aria-hidden="true">📖</span> New here? How to use this
+          <span aria-hidden="true">📖</span> {tr('New here? How to use this', 'ui.newHere')}
         </span>
         <span className="text-xs text-muted-foreground">
-          {open ? 'hide' : 'read the guide'}{' '}
+          {open ? tr('hide', 'ui.hide') : tr('read the guide', 'ui.readGuide')}{' '}
           <span aria-hidden="true">{open ? '▾' : '▸'}</span>
         </span>
       </button>

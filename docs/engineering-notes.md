@@ -413,6 +413,8 @@ Enforced in `packages/engine` (mostly `probability.ts`).
 
 ## Reading real items: pastes, profiles, streamer gear
 
+- **A brace-headed Chinese item (`{ 前缀属性 "使节的" (等阶：5) }`) is not a 国服 Ctrl+C paste.** `pasteLocale.ts` rewrites clipboard lines onto English templates. `scripts/cn-item.mts` reads the other shape: tier name in quotes, display tier in the header (`等阶` counts from the best tier down), stat lines under it. Files saved by the Chinese client are often GB18030; `decodeCnItem` tries UTF-8 and falls back. It matches the base's Chinese lexicon text exactly, then by similarity, and prints anything still loose instead of guessing. The first block is the crafted item Path of Building pastes: item class, English base, `Crafted: true`, then `Prefix:` / `Suffix:` lines whose value is a mod id plus `{range:}` (`data/pob/item-mods.json`, from Path of Building's mod list). The rare name is not in that block. Stat lines follow `Implicits`. `{rune}` stays an implicit and `{desecrated}` stays on the mod text. `品质（魔力词缀）` is a catalyst, written `Catalyst` / `CatalystQuality`, not `Quality`. A line tagged `(rune)` or `腐化强化` can share its words with a craftable mod; the note says so, it does not invent a rune or corruption pool the data does not have. When the lexicon copies one element's Chinese onto the others, a tied fuzzy score is broken only by the header's element tag, and the note says so.
+
 - **CRAFTED TIERS CARRY THE GAME'S OWN MODIFIER IDS, as `tiers[].codes`** — a FILE field like
   `tiers[].stats`, stripped from the browser asset by `shipMods.ts` and read only by the periodic gear
   job. Written by `tools/refresh/apply_codes.mjs`, which **must run after `apply_pools.mjs`** (that
@@ -1137,6 +1139,7 @@ Enforced in `packages/engine` (mostly `probability.ts`).
 
 `src/`.
 
+- **An item cap is a restart surcharge inside the same solve** (`maxItems`, `markovItemCap.ts`). The currency optimum is solved first. When `1/(1−q(start))` already fits, the policy is unchanged. When it does not, policy iteration is re-run with an extra charge on restart alone — the lattice is not rebuilt — and the smallest charge whose true item count fits is the plan that is published. The reported cost is that policy re-evaluated at the real `restartCost`; the surcharge is not currency. The graph draws that frozen policy, not a fresh argmin, or removing the surcharge would undo the cap. Value iteration has no `q`, so a cap on that path is reported unmet. A blank price in `ItemBudget` is still "not for sale", never 0, and the price button still does not solve again.
 - **The Search-effort control must be rendered on every tab that obeys it.** `ItemActions` passed
   `limitsFor(effort)` to the solver while the picker lived inside EngineLab's lab-mode branch, so a
   from-item craft ran under a setting its own tab could not show. It is `SearchEffort.tsx` now, with

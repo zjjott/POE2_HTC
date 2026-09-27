@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import {
-  ALL_GROUPS, describeGroup, setExclusions, toExcludedKeys, useExclusions,
+  ALL_GROUPS, setExclusions, toExcludedKeys, useExclusions,
   type CurrencyGroup,
 } from '../../lib/currencyPrefs';
+import { tr, useLocale } from '../../lib/i18n';
 
 /**
  * "Which currencies don't you have?" — so the planners stop recommending routes you can't run.
@@ -17,6 +18,9 @@ import {
  */
 const CurrencyExclusions: React.FC = () => {
   const exclusions = useExclusions();
+  useLocale();
+  const groupName = (g: CurrencyGroup) => tr(g.label, `grp.${g.id}`);
+  const memberName = (id: string, label: string) => tr(label, `mem.${id}`);
   const [open, setOpen] = useState(false);
   const excludedCount = toExcludedKeys(exclusions).length;
 
@@ -42,10 +46,10 @@ const CurrencyExclusions: React.FC = () => {
         aria-expanded={open}
       >
         <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          Currency I don’t have
+          {tr('Currency I don’t have', 'ui.currencyMissing')}
         </span>
         <span className="text-xs text-muted-foreground">
-          {excludedCount === 0 ? 'nothing excluded' : `${excludedCount} excluded`}{' '}
+          {excludedCount === 0 ? tr('nothing excluded', 'ui.nothingExcluded') : tr(`${excludedCount} excluded`, 'ui.nExcluded', { n: excludedCount })}{' '}
           <span aria-hidden="true">{open ? '▾' : '▸'}</span>
         </span>
       </button>
@@ -53,8 +57,7 @@ const CurrencyExclusions: React.FC = () => {
       {open && (
         <div className="px-3 pb-3 space-y-2 border-t border-border pt-2">
           <p className="text-[11px] text-muted-foreground">
-            Plans will never use anything you tick here. If that makes a craft impossible, you’ll be told
-            rather than shown a plan you can’t run.
+            {tr('Plans will never use anything you tick here. If that makes a craft impossible, you’ll be told rather than shown a plan you can’t run.', 'ui.excludeHint')}
           </p>
           {ALL_GROUPS.map((g) => {
             const entry = exclusions[g.id];
@@ -63,15 +66,17 @@ const CurrencyExclusions: React.FC = () => {
               <div key={g.id} className="text-sm">
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input type="checkbox" checked={on} onChange={() => toggleGroup(g)} />
-                  <span>{g.label}</span>
+                  <span>{groupName(g)}</span>
                   {on && (
-                    <span className="text-[11px] text-amber-300">— {describeGroup(g, entry.only)}</span>
+                    <span className="text-[11px] text-amber-300">— {entry.only.length === 0 || g.members.length === 0
+                      ? tr(`excluding all ${g.label.toLowerCase()}`, 'ui.excludingAll', { name: groupName(g) })
+                      : tr(`excluding only ${g.members.filter((m) => entry.only.includes(m.id)).map((m) => m.label).join(', ')}`, 'ui.excludingOnly', { name: g.members.filter((m) => entry.only.includes(m.id)).map((m) => memberName(m.id, m.label)).join('、') })}</span>
                   )}
                 </label>
                 {/* A row whose label cannot carry its own effect says it in a line underneath, always
                     visible — the strength shortcut spans currencies the reader can also see listed
                     separately below, and "what is this?" is the wrong thing to make them guess. */}
-                {g.hint && <p className="ml-6 text-[11px] text-muted-foreground">{g.hint}</p>}
+                {g.hint && <p className="ml-6 text-[11px] text-muted-foreground">{tr(g.hint, `grp.${g.id}.hint`)}</p>}
                 {/* Narrowing only appears once the group is marked, and only where there is something
                     to narrow: Alchemy and Annulment have exactly one version each. */}
                 {on && g.members.length > 0 && (
@@ -83,7 +88,7 @@ const CurrencyExclusions: React.FC = () => {
                           checked={entry.only.includes(m.id)}
                           onChange={() => toggleMember(g, m.id)}
                         />
-                        <span>{m.label}</span>
+                        <span>{memberName(m.id, m.label)}</span>
                       </label>
                     ))}
                   </div>

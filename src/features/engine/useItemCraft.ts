@@ -13,6 +13,7 @@ import type { Spare } from '../../../packages/optimizer/src/slots.ts';
 import { NO_SPARE } from '../../../packages/optimizer/src/slots.ts';
 import { limitsWithRunes } from '../../../packages/engine/src/runes.ts';
 import { useDefaultBase, useEngine } from './useEngine';
+import { useLocale } from '../../lib/i18n';
 import { useSolveRunner } from './useSolveRunner';
 import type { SolveRequest } from '../../lib/solve';
 import { craftSig } from '../../lib/craftAlong';
@@ -84,7 +85,8 @@ export function useItemCraft() {
   // Exalts-per-chaos / per-divine, so a huge cost reads as a quantity rather than a wall of digits.
   const rates = engine ? priceBasis(engine).rates : undefined;
 
-  const bases: EngineBase[] = useMemo(() => (engine ? listBases(engine.data) : []), [engine]);
+  const locale = useLocale();
+  const bases: EngineBase[] = useMemo(() => (engine ? listBases(engine.data) : []), [engine, locale]);
   // The item builder offers ROLLABLE mods AND desecrated mods — a real item can carry a desecrated
   // mod, and modelling it matters (it eats a slot + family, and it's the sole Omen-of-Light target).
   // Desecrated mods are NOT in `addable` below: no modelled currency can ADD one to the item.
@@ -101,17 +103,17 @@ export function useItemCraft() {
       prefixes: [...normal(m.prefixes), ...desOf('prefix')],
       suffixes: [...normal(m.suffixes), ...desOf('suffix')],
     };
-  }, [engine, baseId, runes]);
+  }, [engine, baseId, runes, locale]);
   // Perfect essences + desecrated mods: offered as TARGETS in the from-item flow (a Perfect Essence
   // adds its mod while removing one random mod; a Desecration adds a desecrated mod via its boss omen).
   // Not shown in the current-item builder's add columns.
   const perfect = useMemo(
     () => (engine && baseId ? listPerfectEssences(engine.data, baseId) : []),
-    [engine, baseId],
+    [engine, baseId, locale],
   );
   const desecratedTargets = useMemo(
     () => (engine && baseId ? listDesecrated(engine.data, baseId) : []),
-    [engine, baseId],
+    [engine, baseId, locale],
   );
   const modById = useMemo(() => {
     const m = new Map<string, EngineMod>();

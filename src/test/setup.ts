@@ -14,7 +14,9 @@ afterEach(async () => {
   ]);
   setWorkspace(defaultWorkspace());
   setExclusions({});
-  localStorage.clear();
+  // Node's experimental localStorage (a `--localstorage-file` flag with no path) has no `clear`.
+  // jsdom's Storage does. Skip when it isn't the browser one, instead of failing every test.
+  if (typeof localStorage.clear === 'function') localStorage.clear();
 });
 
 /**
@@ -37,7 +39,7 @@ class InProcessWorker implements Partial<Worker> {
   onerror: ((e: ErrorEvent) => void) | null = null;
   private alive = true;
 
-  async postMessage(msg: { id: number; req: unknown }): Promise<void> {
+  async postMessage(msg: { id: number; req: unknown; locale?: 'en' | 'zh-CN' }): Promise<void> {
     const emit = (data: unknown): void => {
       // A terminated worker is silent — that is what makes cancellation work in the real client.
       if (this.alive) this.onmessage?.({ data } as MessageEvent);
@@ -48,11 +50,13 @@ class InProcessWorker implements Partial<Worker> {
       // to fit in one tick. Exactly that hid three missing `waitFor`s until a slower CI runner failed
       // on them, so this makes the asynchrony non-negotiable and local runs representative.
       await new Promise((r) => setTimeout(r, 5));
-      const [{ runSolve }, { loadEngine }] = await Promise.all([
+      const [{ runSolve }, { loadEngine }, { setLocale }] = await Promise.all([
         import('../lib/solve'),
         import('../lib/engine'),
+        import('../lib/i18n'),
       ]);
       const eng = await loadEngine();
+      if (msg.locale === 'en' || msg.locale === 'zh-CN') setLocale(msg.locale);
       const result = runSolve(eng, msg.req as never, (progress) => emit({ id: msg.id, type: 'progress', progress }));
       emit({ id: msg.id, type: 'done', result });
     } catch (err) {

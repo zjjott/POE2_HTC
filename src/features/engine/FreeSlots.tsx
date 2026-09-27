@@ -1,5 +1,6 @@
 import React from 'react';
 import type { Spare } from '../../../packages/optimizer/src/slots.ts';
+import { tr, useLocale } from '../../lib/i18n';
 
 /**
  * "Any prefix / any suffix" — a position on the finished item whose contents the player doesn't care
@@ -41,6 +42,7 @@ export const AnyModRow: React.FC<{
   readonly block: string | null;
   readonly onAdd: () => void;
 }> = ({ side, block, onAdd }) => {
+  useLocale();
   const reasonId = block ? `why-any-${side}` : undefined;
   return (
     <div
@@ -48,8 +50,8 @@ export const AnyModRow: React.FC<{
       title={block ?? `Finish the craft whatever lands in one ${SIDE_WORD[side]}, or leave it empty.`}
     >
       <span className="flex-1 min-w-0 truncate text-sm">
-        <span className="font-medium">Any {SIDE_WORD[side]}</span>
-        <span className="text-muted-foreground"> — I don’t care what lands here</span>
+        <span className="font-medium">{tr(`Any ${SIDE_WORD[side]}`, side === 'prefix' ? 'ui.anyPrefix' : 'ui.anySuffix')}</span>
+        <span className="text-muted-foreground">{tr(' — I don’t care what lands here', 'ui.anyNote')}</span>
       </span>
       {reasonId && <span id={reasonId} className="sr-only">{block}</span>}
       <button
@@ -75,7 +77,9 @@ export const AnyModRow: React.FC<{
 export const FreeSlotRows: React.FC<{
   readonly spare: Spare;
   readonly onRemove: (side: 'prefix' | 'suffix') => void;
-}> = ({ spare, onRemove }) => (
+}> = ({ spare, onRemove }) => {
+  useLocale();
+  return (
   <>
     {(['prefix', 'suffix'] as const).flatMap((side) =>
       Array.from({ length: spareOn(spare, side) }, (_, i) => (
@@ -87,8 +91,7 @@ export const FreeSlotRows: React.FC<{
             {side === 'prefix' ? 'P' : 'S'}
           </span>
           <span className="flex-1 min-w-40 text-sm text-muted-foreground">
-            <strong className="text-foreground">Any {SIDE_WORD[side]}</strong> — whatever lands here is
-            fine, and so is leaving it empty
+            <strong className="text-foreground">{tr(`Any ${SIDE_WORD[side]}`, side === 'prefix' ? 'ui.anyPrefix' : 'ui.anySuffix')}</strong>{tr(' — I don’t care what lands here', 'ui.anyNote')}
           </span>
           <button
             onClick={() => onRemove(side)}
@@ -101,7 +104,8 @@ export const FreeSlotRows: React.FC<{
         </div>
       )))}
   </>
-);
+  );
+};
 
 /**
  * What a free slot does to the answer, said once beneath the target list.
